@@ -1971,12 +1971,12 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	simSetIntegerParameter(sim_intparam_error_report_mode, errorModeSaved);
 
 
-	// ---------------------------------------------------------------- //
-	// ---------------------------------------------------------------- //
-	//! -------------- WHEN THE USER CLICKS THE PLAY BUTTON ------------------//
-	// --------this function is executed only once------------ //
-	// ---------------------------------------------------------------- //
-	// ---------------------------------------------------------------- //
+	// ------------------------------------------------------------------------- //
+	// ------------------------------------------------------------------------- //
+	// ------------------ WHEN THE USER CLICKS THE PLAY BUTTON ------------------//
+	// ------------------- this function is executed only once ----------------- //
+	// ------------------------------------------------------------------------- //
+	// ------------------------------------------------------------------------- //
 	if (message == sim_message_eventcallback_simulationabouttostart)
 	{
 		// Initialize the device
@@ -1985,9 +1985,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		else
 			cout << "Init no good" << endl;
 
-		// NOTE: the reference frames of the real haptic device and of the virtual haptic device coincide.
-		// The relation between the real and virtual world is an identity matrix. Anyway it is possible to scale 
-		// the dimension of the virtual WS setting the value WS_RADIUS.
+		// NOTE: the reference frames of the real haptic device and of the virtual 
+		// haptic device coincide. The relation between the real and virtual world 
+		// is an identity matrix. Anyway it is possible to scale the dimension of 
+		// the virtual WS setting the value WS_RADIUS.
 
 		// Create a dummy point to be graphically associated with the position of 
 		// the haptic device in the virtual scene.
@@ -2006,7 +2007,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
 
-		// Impose to the cursor the same pose of the haptic device 
+		// Impose to the dummy the same pose of the haptic device 
 		simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
 		cout << "Position set" << endl;
 		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
@@ -2023,7 +2024,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	// ------------------------------------------------------------------------- //
 	if (simGetSimulationState() == sim_simulation_advancing_running)
 	{
-		// Read the state of the haptic device (position, rotation, velocity in the virtual RF)
+		// Read the state of the haptic device 
+		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
 
 		// Updating position
@@ -2034,11 +2036,17 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
 		cout << "qui" << endl;
 
-		// Updating Rotation
+		// Updating Dummy Rotation
 		Eigen::Matrix3f temp;
-		temp = Eigen::AngleAxisf(-M_PI, Eigen::Vector3f::UnitY());
-		temp = temp * device_state.rot;
+		temp = Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitZ());
+		temp = temp * Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitY());
+		temp = device_state.rot * temp;
 		simSetObjectOrientation(dummy_handler, -1, getEulerAngles(temp));
+
+		// Updating Cone Rotation
+		Matrix3f cone_rotation_offset;
+		cone_rotation_offset = Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY());
+		simSetObjectOrientation(tool_handler, dummy_handler, getEulerAngles(cone_rotation_offset));
 	}
 
 
