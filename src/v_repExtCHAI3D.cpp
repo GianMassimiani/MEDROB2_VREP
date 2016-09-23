@@ -150,6 +150,8 @@ simInt dummy_handler;
 simInt tool_handler;
 simFloat resolution = 2.0;
 
+Matrix3f dummy_tool_rotation_offset;
+
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
 //! ------------------ UTILITIES DECLARATIONS ----------------------//
@@ -158,6 +160,7 @@ simFloat resolution = 2.0;
 float* multiplyByScalar(float* a, float b);
 float* getEulerAngles(Eigen::Matrix3f rot);
 float** eigen2SimMatrix(const Eigen::Matrix3f eigen);
+Eigen::Matrix3f getRotationMatrix(const float* euler);
 
 
 
@@ -1999,18 +2002,32 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// A virtual coupling is implemented between the dummy and the tool.
 		tool_handler = simCreatePureShape(3, 31, tool_size, 0.01, NULL);
 
-		simSetObjectParent(tool_handler, dummy_handler, true);
+		simSetObjectParent(tool_handler, -1, true);
 
-
-		//! QUI
 		// Read the state of the haptic device (position, rotation, velocity)
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
 
-		// Impose to the dummy the same pose of the haptic device 
+		// Impose to the DUMMY the same pose of the haptic device 
 		simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
-		cout << "Position set" << endl;
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		Eigen::Matrix3f temp;
+		temp = Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitZ());
+		temp = temp * Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitY());
+		temp = device_state.rot * temp;
+		simSetObjectOrientation(dummy_handler, -1, getEulerAngles(temp));
+
+		//// TOOL pose
+		simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
+
+		float tool_rotation_offset_angles[3];
+		simGetObjectOrientation(tool_handler, -1, tool_rotation_offset_angles);
+		cout << tool_rotation_offset_angles[0] << endl << tool_rotation_offset_angles[1] << endl << tool_rotation_offset_angles[2] << endl;
+		//dummy_tool_rotation_offset = getRotationMatrix(tool_rotation_offset_angles);
+		//dummy_tool_rotation_offset = dummy_tool_rotation_offset.transpose() * temp;
+
+		//simSetObjectOrientation(tool_handler, tool_handler, getEulerAngles(dummy_tool_rotation_offset * temp));
+		
+
 	}
 
 
@@ -2032,9 +2049,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		float* dummy_pos = device_state.getSimPos();
 		dummy_pos = multiplyByScalar(dummy_pos, resolution);
 		simSetObjectPosition(dummy_handler, -1, dummy_pos);
+
 		float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
 		simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
-		cout << "qui" << endl;
 
 		// Updating Dummy Rotation
 		Eigen::Matrix3f temp;
@@ -2043,10 +2060,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		temp = device_state.rot * temp;
 		simSetObjectOrientation(dummy_handler, -1, getEulerAngles(temp));
 
-		// Updating Cone Rotation
-		Matrix3f cone_rotation_offset;
-		cone_rotation_offset = Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY());
-		simSetObjectOrientation(tool_handler, dummy_handler, getEulerAngles(cone_rotation_offset));
+		//// Updating Cone Rotation
+		simSetObjectOrientation(tool_handler, -1, getEulerAngles(dummy_tool_rotation_offset * temp));
 	}
 
 
@@ -2095,6 +2110,30 @@ float* getEulerAngles(Eigen::Matrix3f rot)
 	euler_angles[2] = -atan2(rot(1, 0), rot(0, 0));
 
 	return euler_angles;
+}
+
+Eigen::Matrix3f getRotationMatrix(const float* euler)
+{
+	Matrix3f rot_X;
+	Matrix3f rot_Y;
+	Matrix3f rot_Z;
+
+	rot_X <<
+		1,				0,					0,
+		0,	cos(euler[0]),		-sin(euler[0]),
+		0,  sin(euler[0]),		cos(euler[0]);
+
+	rot_Y <<
+		cos(euler[1]), 0, sin(euler[1]),
+		0, 1, 0,
+		-sin(euler[1]), 0, cos(euler[1]);
+	rot_Z <<
+		cos(euler[2]), -sin(euler[2]), 0,
+		sin(euler[2]), cos(euler[2]), 0,
+		0, 0, 1;
+	Matrix3f out;
+	out = (rot_X * rot_Y * rot_Z);
+	return out;
 }
 
 float** eigen2SimMatrix(const Eigen::Matrix3f eigen)
