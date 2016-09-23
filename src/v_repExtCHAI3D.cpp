@@ -150,7 +150,11 @@ simInt dummy_handler;
 simInt tool_handler;
 simFloat resolution = 2.0;
 
-Matrix3f dummy_tool_rotation_offset;
+float prev_tool_matrix[12];
+
+Matrix3f rot_off_dummy_device;
+Matrix3f rot_off_tool_dummy;
+Matrix3f init;
 
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
@@ -2008,19 +2012,24 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
 
+		//! OFFSET
+		init = device_state.rot.transpose();
+		cout << init << endl;
+
+		Matrix3f rotazione_finale_globale;
+		rotazione_finale_globale = init * device_state.rot;
+
 		// Impose to the DUMMY the same pose of the haptic device 
 		simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		simSetObjectOrientation(dummy_handler, -1, getEulerAngles(rotazione_finale_globale));
 
-		//// TOOL pose
+		// TOOL pose
 		simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
-		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
-		
+		simSetObjectOrientation(tool_handler, -1, getEulerAngles(rotazione_finale_globale));
+		simGetObjectMatrix(tool_handler, -1, prev_tool_matrix);
 
 	}
-
-
-
+	
 
 	// ------------------------------------------------------------------------- //
 	// ------------------------------------------------------------------------- //
@@ -2037,16 +2046,37 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Updating position
 		float* dummy_pos = device_state.getSimPos();
 		dummy_pos = multiplyByScalar(dummy_pos, resolution);
-		simSetObjectPosition(dummy_handler, -1, dummy_pos);
+		simSetObjectPosition(dummy_handler	, -1, dummy_pos);
+		simSetObjectPosition(tool_handler	, -1, dummy_pos);
 
-		//float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
-		//simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
+		float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
+		simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
 
-		// Updating Dummy Rotation
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		Matrix3f rotazione_finale_globale;
+		rotazione_finale_globale = init * device_state.rot;
+
+		//// Updating Dummy Rotation
+		//simSetObjectOrientation(dummy_handler, -1, getEulerAngles(rotazione_finale_globale));
 
 		//// Updating Cone Rotation
-		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
+		//simSetObjectOrientation(tool_handler, -1, getEulerAngles(rotazione_finale_globale));
+
+
+
+		float tool_matrix[12], out_matrix[12];
+		simGetObjectMatrix(tool_handler, -1, tool_matrix);
+
+		simInvertMatrix(prev_tool_matrix);
+		simMultiplyMatrices(prev_tool_matrix, tool_matrix, out_matrix);
+		cout << "Matrice differenza" <<endl;
+		cout << out_matrix[0] << "\t" << out_matrix[1] << "\t" << out_matrix[2] << "\t" << out_matrix[3] << endl;
+		cout << out_matrix[4] << "\t" << out_matrix[5] << "\t" << out_matrix[6] << "\t" << out_matrix[7] << endl;
+		cout << out_matrix[8] << "\t" << out_matrix[9] << "\t" << out_matrix[10] << "\t" << out_matrix[11] << endl;
+		//simSetObjectMatrix(dummy_handler, -1, out_matrix);
+		//simSetObjectMatrix(tool_handler, -1, out_matrix);
+
+		simSetObjectOrientation(tool_handler, tool_handler, out_matrix);
+		simCopyMatrix(tool_matrix, prev_tool_matrix);
 	}
 
 
