@@ -1,0 +1,168 @@
+﻿Build started 22/09/2016 16:58:01.
+     1>Project "C:\chai3d-3.1.1\modules\V-REP_proj\CHAI3D-V-REP-VS2015.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\CL.exe /c /I"external\V-REP\include" /I..\..\src /I..\..\external\glew\include /I..\..\external\Eigen /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _WINDOWS /D _USRDLL /D _WINDLL /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"obj/Debug/Win32\\" /Fd"obj/Debug/Win32\vc140.pdb" /Gd /TP /wd4996 /analyze- /errorReport:prompt DeviceState.cpp "external\V-REP\common\luaFunctionData.cpp" "external\V-REP\common\luaFunctionDataItem.cpp" "external\V-REP\common\v_repLib.cpp" src\v_repExtCHAI3D.cpp
+         v_repExtCHAI3D.cpp
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(149): warning C4838: conversion from 'double' to 'simFloat' requires a narrowing conversion
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(149): warning C4305: 'initializing': truncation from 'double' to 'simFloat'
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(1201): warning C4244: 'argument': conversion from 'simFloat' to 'unsigned int', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(1202): warning C4244: 'argument': conversion from 'simFloat' to 'unsigned int', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(1972): warning C4305: 'argument': truncation from 'double' to 'simFloat'
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(1975): warning C4305: 'argument': truncation from 'double' to 'simFloat'
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2000): warning C4305: 'argument': truncation from 'double' to 'const float'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(43): error C2039: 'ReturnType': is not a member of 'Eigen::internal::scalar_product_traits<float,double>'
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(43): note: see reference to class template instantiation 'Eigen::internal::traits<Derived>' being compiled
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\matrixbase.h(50): note: see reference to class template instantiation 'Eigen::DenseBase<Derived>' being compiled
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(117): note: see reference to class template instantiation 'Eigen::MatrixBase<Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>>' being compiled
+         c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2001): note: see reference to class template instantiation 'Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>' being compiled
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(43): error C3646: 'Scalar': unknown override specifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(43): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(69): error C2065: 'Scalar': undeclared identifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(69): error C2923: 'Eigen::internal::packet_traits': 'Scalar' is not a valid template type argument for parameter 'T'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(69): error C2955: 'Eigen::internal::packet_traits': use of class template requires template argument list
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\genericpacketmath.h(71): note: see declaration of 'Eigen::internal::packet_traits'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(76): error C2065: 'Scalar': undeclared identifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(76): error C2923: 'Eigen::internal::packet_traits': 'Scalar' is not a valid template type argument for parameter 'T'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(76): error C2955: 'Eigen::internal::packet_traits': use of class template requires template argument list
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\genericpacketmath.h(71): note: see declaration of 'Eigen::internal::packet_traits'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(94): error C2065: 'Scalar': undeclared identifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(94): error C2923: 'Eigen::NumTraits': 'Scalar' is not a valid template type argument for parameter 'T'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(94): error C2955: 'Eigen::NumTraits': use of class template requires template argument list
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\numtraits.h(88): note: see declaration of 'Eigen::NumTraits'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(95): error C2065: 'Scalar': undeclared identifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(95): error C2923: 'Eigen::NumTraits': 'Scalar' is not a valid template type argument for parameter 'T'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(95): error C2955: 'Eigen::NumTraits': use of class template requires template argument list
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\numtraits.h(88): note: see declaration of 'Eigen::NumTraits'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(107): error C2065: 'Scalar': undeclared identifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(107): error C2923: 'Eigen::internal::packet_traits': 'Scalar' is not a valid template type argument for parameter 'T'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(107): error C2955: 'Eigen::internal::packet_traits': use of class template requires template argument list
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\genericpacketmath.h(71): note: see declaration of 'Eigen::internal::packet_traits'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(43): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(43): error C2146: syntax error: missing '>' before identifier 'Scalar'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(44): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(44): error C2146: syntax error: missing '>' before identifier 'Scalar'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densecoeffsbase.h(39): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\util\xprhelper.h(372): note: see reference to class template instantiation 'Eigen::DenseCoeffsBase<Derived,0>' being compiled
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(49): note: see reference to class template instantiation 'Eigen::internal::special_scalar_op_base<Derived,int,int,Eigen::DenseCoeffsBase<Derived,0>,false>' being compiled
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densecoeffsbase.h(39): error C3646: 'Scalar': unknown override specifier
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densecoeffsbase.h(39): error C4430: missing type specifier - int assumed. Note: C++ does not support default-int
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(62): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(240): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\util\xprhelper.h(179): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\util\xprhelper.h(174): note: see reference to class template instantiation 'Eigen::internal::plain_matrix_type_dense<T,Eigen::internal::traits<T>::XprKind>' being compiled
+                 with
+                 [
+                     T=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\util\xprhelper.h(207): note: see reference to class template instantiation 'Eigen::internal::plain_matrix_type<T,Eigen::Dense>' being compiled
+                 with
+                 [
+                     T=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+         c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(354): note: see reference to class template instantiation 'Eigen::internal::eval<Derived,Eigen::Dense>' being compiled
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\util\xprhelper.h(179): error C2146: syntax error: missing '>' before identifier 'Scalar'
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(400): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\densebase.h(401): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\matrixbase.h(56): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\matrixbase.h(109): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\plugins\commoncwiseunaryops.h(43): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\plugins\commoncwiseunaryops.h(60): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\matrixbase.h(416): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\external\eigen\eigen\src\core\products\coeffbasedproduct.h(121): error C2039: 'Scalar': is not a member of 'Eigen::internal::traits<Derived>'
+                 with
+                 [
+                     Derived=Eigen::CoeffBasedProduct<const Eigen::Matrix<float,3,3,0,3,3> &,const Eigen::Matrix<double,3,3,0,3,3> &,6>
+                 ]
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2038): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2039): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2040): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2052): warning C4244: '=': conversion from 'const double' to 'float', possible loss of data
+         v_repLib.cpp
+         luaFunctionDataItem.cpp
+         luaFunctionData.cpp
+         DeviceState.cpp
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(35): warning C4244: '=': conversion from 'const double' to 'float', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(54): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(55): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(56): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+         Generating Code...
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(25): warning C4172: returning address of local variable or temporary: temp
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(35): warning C4700: uninitialized local variable 'temp' used
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(58): warning C4172: returning address of local variable or temporary: euler_angles
+     1>Done Building Project "C:\chai3d-3.1.1\modules\V-REP_proj\CHAI3D-V-REP-VS2015.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:06.10

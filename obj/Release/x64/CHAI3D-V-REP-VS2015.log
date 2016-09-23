@@ -1,0 +1,22 @@
+﻿Build started 20/09/2016 10:43:32.
+     1>Project "C:\chai3d-3.1.1\modules\V-REP\CHAI3D-V-REP-VS2015.vcxproj" on node 2 (Rebuild target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\x86_amd64\CL.exe /c /I"external\V-REP\include" /I..\..\src /I..\..\external\glew\include /I..\..\external\Eigen /Zi /nologo /W3 /WX- /O2 /Oi /GL /D WIN32 /D NDEBUG /D _WINDOWS /D _USRDLL /D _WINDLL /D _MBCS /GF /Gm- /EHsc /MD /GS- /Gy- /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"obj/Release/x64\\" /Fd"obj/Release/x64\vc140.pdb" /Gd /TP /wd4996 /errorReport:prompt "external\V-REP\common\luaFunctionData.cpp" "external\V-REP\common\luaFunctionDataItem.cpp" "external\V-REP\common\v_repLib.cpp" src\v_repExtCHAI3D.cpp
+         luaFunctionData.cpp
+         luaFunctionDataItem.cpp
+         v_repLib.cpp
+         v_repExtCHAI3D.cpp
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\x86_amd64\link.exe /ERRORREPORT:PROMPT /OUT:"bin/win-x64\v_repExtCHAI3D.dll" /INCREMENTAL:NO /NOLOGO /LIBPATH:..\..\lib\Release\x64 chai3d.lib opengl32.lib glu32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /Debug /PDB:"bin/win-x64\v_repExtCHAI3D.pdb" /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /LTCG:incremental /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"bin/win-x64\v_repExtCHAI3D.lib" /MACHINE:X64 /DLL obj/Release/x64\luaFunctionData.obj
+         obj/Release/x64\luaFunctionDataItem.obj
+         obj/Release/x64\v_repLib.obj
+         obj/Release/x64\v_repExtCHAI3D.obj
+            Creating library bin/win-x64\v_repExtCHAI3D.lib and object bin/win-x64\v_repExtCHAI3D.exp
+         Generating code
+         Finished generating code
+         CHAI3D-V-REP-VS2015.vcxproj -> C:\chai3d-3.1.1\modules\V-REP\bin/win-x64\v_repExtCHAI3D.dll
+     1>Done Building Project "C:\chai3d-3.1.1\modules\V-REP\CHAI3D-V-REP-VS2015.vcxproj" (Rebuild target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:06.79
