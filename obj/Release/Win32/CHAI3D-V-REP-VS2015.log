@@ -1,4 +1,4 @@
-﻿Build started 23/09/2016 14:42:45.
+﻿Build started 23/09/2016 15:35:37.
      1>Project "C:\chai3d-3.1.1\modules\V-REP_proj\CHAI3D-V-REP-VS2015.vcxproj" on node 2 (Build target(s)).
      1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
      1>ClCompile:
@@ -10,10 +10,6 @@
      1>src\v_repExtCHAI3D.cpp(1204): warning C4244: 'argument': conversion from 'simFloat' to 'unsigned int', possible loss of data
      1>src\v_repExtCHAI3D.cpp(1998): warning C4305: 'argument': truncation from 'double' to 'simFloat'
      1>src\v_repExtCHAI3D.cpp(2003): warning C4305: 'argument': truncation from 'double' to 'simFloat'
-     1>src\v_repExtCHAI3D.cpp(2014): warning C4305: 'argument': truncation from 'double' to 'const float'
-     1>src\v_repExtCHAI3D.cpp(2015): warning C4305: 'argument': truncation from 'double' to 'const float'
-     1>src\v_repExtCHAI3D.cpp(2058): warning C4305: 'argument': truncation from 'double' to 'const float'
-     1>src\v_repExtCHAI3D.cpp(2059): warning C4305: 'argument': truncation from 'double' to 'const float'
        Link:
          C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll" /INCREMENTAL:NO /NOLOGO /LIBPATH:..\..\lib\Release\Win32 chai3d.lib opengl32.lib glu32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /Debug /PDB:"..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.pdb" /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /LTCG:incremental /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib" /MACHINE:X86 /SAFESEH /DLL obj/Release/Win32\DeviceState.obj
          obj/Release/Win32\luaFunctionData.obj
@@ -22,9 +18,9 @@
          obj/Release/Win32\v_repExtCHAI3D.obj
             Creating library ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib and object ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
          Generating code
-     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2102): warning C4172: returning address of local variable or temporary: c
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2087): warning C4172: returning address of local variable or temporary: c
      1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(25): warning C4172: returning address of local variable or temporary: temp
-     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2112): warning C4172: returning address of local variable or temporary: euler_angles
+     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(58): warning C4172: returning address of local variable or temporary: euler_angles
      1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.h(12): warning C4172: returning address of local variable or temporary: temp
          Finished generating code
          CHAI3D-V-REP-VS2015.vcxproj -> C:\chai3d-3.1.1\modules\V-REP_proj\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll
@@ -32,4 +28,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:06.18
+Time Elapsed 00:00:05.10

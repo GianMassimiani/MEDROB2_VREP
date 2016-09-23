@@ -2010,22 +2010,11 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// Impose to the DUMMY the same pose of the haptic device 
 		simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
-		Eigen::Matrix3f temp;
-		temp = Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitZ());
-		temp = temp * Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitY());
-		temp = device_state.rot * temp;
-		simSetObjectOrientation(dummy_handler, -1, getEulerAngles(temp));
+		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
 
 		//// TOOL pose
 		simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
-
-		float tool_rotation_offset_angles[3];
-		simGetObjectOrientation(tool_handler, -1, tool_rotation_offset_angles);
-		cout << tool_rotation_offset_angles[0] << endl << tool_rotation_offset_angles[1] << endl << tool_rotation_offset_angles[2] << endl;
-		//dummy_tool_rotation_offset = getRotationMatrix(tool_rotation_offset_angles);
-		//dummy_tool_rotation_offset = dummy_tool_rotation_offset.transpose() * temp;
-
-		//simSetObjectOrientation(tool_handler, tool_handler, getEulerAngles(dummy_tool_rotation_offset * temp));
+		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
 		
 
 	}
@@ -2050,18 +2039,14 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		dummy_pos = multiplyByScalar(dummy_pos, resolution);
 		simSetObjectPosition(dummy_handler, -1, dummy_pos);
 
-		float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
-		simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
+		//float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
+		//simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
 
 		// Updating Dummy Rotation
-		Eigen::Matrix3f temp;
-		temp = Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitZ());
-		temp = temp * Eigen::AngleAxisf(M_PI, Eigen::Vector3f::UnitY());
-		temp = device_state.rot * temp;
-		simSetObjectOrientation(dummy_handler, -1, getEulerAngles(temp));
+		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
 
 		//// Updating Cone Rotation
-		simSetObjectOrientation(tool_handler, -1, getEulerAngles(dummy_tool_rotation_offset * temp));
+		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
 	}
 
 
