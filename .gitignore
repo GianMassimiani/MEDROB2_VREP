@@ -2,7 +2,7 @@
 *.db 
 *.tlog
 *.obj
-
+*.log
 *.slo
 *.lo
 *.o
