@@ -1,1 +1,9 @@
-*.sdf
+*.sdf 
+*.db 
+*.tlog
+*.obj
+
+*.slo
+*.lo
+*.o
+*.out

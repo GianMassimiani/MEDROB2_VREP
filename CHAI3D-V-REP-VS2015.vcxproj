@@ -98,7 +98,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>..\..\..\Program Files %28x86%29\V-REP3\V-REP_PRO_EDU</OutDir>
+    <OutDir>..\..\..\..\..\..\Program Files %28x86%29\V-REP3\V-REP_PRO_EDU</OutDir>
     <IntDir>obj/$(Configuration)/$(Platform)\</IntDir>
     <TargetName>v_repExtCHAI3D</TargetName>
   </PropertyGroup>
