@@ -161,6 +161,7 @@ float* multiplyByScalar(float* a, float b);
 float* getEulerAngles(Eigen::Matrix3f rot);
 float** eigen2SimMatrix(const Eigen::Matrix3f eigen);
 Eigen::Matrix3f getRotationMatrix(const float* euler);
+float* getSimTransformMatrix(Eigen::Matrix3f rot, Eigen::Vector3f pos);
 
 
 
@@ -2008,13 +2009,28 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
 
-		// Impose to the DUMMY the same pose of the haptic device 
-		simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		// Updating Dummy pose
+		simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix_Original(resolution));
+
+		//// Updating Cone pose
+		Matrix3f orientation;
+		orientation = device_state.rot;
+		orientation.col(0) = device_state.rot.col(2);
+		orientation.col(2) = -device_state.rot.col(0);
+		simSetObjectMatrix(tool_handler, -1, getSimTransformMatrix(orientation, resolution * device_state.pos));
+
+		//// Impose to the DUMMY the same pose of the haptic device 
+		//simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix(resolution));
+
+		////simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
+		////simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
 
 		//// TOOL pose
-		simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
-		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
+		//simSetObjectMatrix(tool_handler, -1, device_state.getSimTransformMatrix(resolution));
+
+		////simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
+		////simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
+
 
 
 	}
@@ -2035,19 +2051,23 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		chai3DReadState(DEVICE_IDX, device_state);
 
 		// Updating position
-		float* dummy_pos = device_state.getSimPos();
-		dummy_pos = multiplyByScalar(dummy_pos, resolution);
-		simSetObjectPosition(dummy_handler, -1, dummy_pos);
-		simSetObjectPosition(tool_handler, -1, dummy_pos);
+		//float* dummy_pos = device_state.getSimPos();
+		//dummy_pos = multiplyByScalar(dummy_pos, resolution);
+		//simSetObjectPosition(dummy_handler, -1, dummy_pos);
+		//simSetObjectPosition(tool_handler, -1, dummy_pos);
 
 		//float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
 		//simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
+		Matrix3f orientation;
+		orientation = device_state.rot;
+		orientation.col(0) = device_state.rot.col(2);
+		orientation.col(2) = -device_state.rot.col(0);
 
 		// Updating Dummy Rotation
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix_Original(resolution));
 
 		//// Updating Cone Rotation
-		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
+		simSetObjectMatrix(tool_handler, -1, getSimTransformMatrix(orientation, resolution * device_state.pos));
 	}
 
 
@@ -2096,6 +2116,28 @@ float* getEulerAngles(Eigen::Matrix3f rot)
 	euler_angles[2] = -atan2(rot(1, 0), rot(0, 0));
 
 	return euler_angles;
+}
+
+float* getSimTransformMatrix(Eigen::Matrix3f rot, Eigen::Vector3f pos)
+{
+	simFloat transform_matrix[12];
+
+	transform_matrix[0] = rot(0, 0);
+	transform_matrix[1] = rot(0, 1);
+	transform_matrix[2] = rot(0, 2);
+	transform_matrix[3] = pos(0);
+
+	transform_matrix[4] = rot(1, 0);
+	transform_matrix[5] = rot(1, 1);
+	transform_matrix[6] = rot(1, 2);
+	transform_matrix[7] = pos(1);
+
+	transform_matrix[8] = rot(2, 0);
+	transform_matrix[9] = rot(2, 1);
+	transform_matrix[10] = rot(2, 2);
+	transform_matrix[11] = pos(2);
+
+	return transform_matrix;
 }
 
 Eigen::Matrix3f getRotationMatrix(const float* euler)

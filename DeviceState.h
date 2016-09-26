@@ -14,6 +14,8 @@ public:
 	inline float** getSimRot(void) { return eigen2SimMatrix(rot); };
 
 	float* getEulerAngles(void);
+	float* getSimTransformMatrix_Original(float resolution = 1.0);
+	float* getSimTransformMatrix(float resolution = 1.0);
 
 	void print(void);
 
