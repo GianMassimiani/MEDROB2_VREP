@@ -8,6 +8,7 @@ DeviceState::DeviceState()
 	pos.setZero();
 	vel.setZero();
 	rot.setZero();
+	T.setIdentity();
 }
 
 

@@ -148,9 +148,15 @@ simFloat tool_size[3] = {
 	(1.5 + TOOL_RADIUS) / 3 };
 simInt dummy_handler;
 simInt tool_handler;
-simFloat resolution = 2.0;
+simFloat resolution = 5.0;
 
-Matrix3f dummy_tool_rotation_offset;
+int button;
+bool first_press = true;
+int global_cnt = 0;
+
+Matrix4f offset_transform;
+Matrix4f tool_transf;
+Matrix4f dummy_transf;
 
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
@@ -159,9 +165,13 @@ Matrix3f dummy_tool_rotation_offset;
 // ---------------------------------------------------------------- //
 float* multiplyByScalar(float* a, float b);
 float* getEulerAngles(Eigen::Matrix3f rot);
-float** eigen2SimMatrix(const Eigen::Matrix3f eigen);
+float* eigen2SimTransform(const Matrix4f& eigen_T);
 Eigen::Matrix3f getRotationMatrix(const float* euler);
+Eigen::Matrix4f simTransform2Eigen(const float* sim_T);
 float* getSimTransformMatrix(Eigen::Matrix3f rot, Eigen::Vector3f pos);
+
+void update_pose(void);
+void get_offset(void);
 
 
 
@@ -1795,6 +1805,11 @@ void chai3DReadState(simInt device_idx, DeviceState& state)
 		state.vel(0) = (float)vel.x();
 		state.vel(1) = (float)vel.y();
 		state.vel(2) = (float)vel.z();
+
+		state.T.block<3, 3>(0, 0) = temp;
+		state.T(0, 3) = state.pos(0);
+		state.T(1, 3) = state.pos(1);
+		state.T(2, 3) = state.pos(2);
 	}
 }
 
@@ -2012,26 +2027,12 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Updating Dummy pose
 		simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix_Original(resolution));
 
-		//// Updating Cone pose
+		//// Updating Cone pose (PLACEHOLDER)
 		Matrix3f orientation;
 		orientation = device_state.rot;
 		orientation.col(0) = device_state.rot.col(2);
 		orientation.col(2) = -device_state.rot.col(0);
 		simSetObjectMatrix(tool_handler, -1, getSimTransformMatrix(orientation, resolution * device_state.pos));
-
-		//// Impose to the DUMMY the same pose of the haptic device 
-		//simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix(resolution));
-
-		////simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
-		////simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
-
-		//// TOOL pose
-		//simSetObjectMatrix(tool_handler, -1, device_state.getSimTransformMatrix(resolution));
-
-		////simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
-		////simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
-
-
 
 	}
 
@@ -2050,24 +2051,41 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
 
-		// Updating position
-		//float* dummy_pos = device_state.getSimPos();
-		//dummy_pos = multiplyByScalar(dummy_pos, resolution);
-		//simSetObjectPosition(dummy_handler, -1, dummy_pos);
-		//simSetObjectPosition(tool_handler, -1, dummy_pos);
+		dummy_transf = device_state.T;
+		simSetObjectMatrix(dummy_handler, -1, eigen2SimTransform(dummy_transf));
 
-		//float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
-		//simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
-		Matrix3f orientation;
-		orientation = device_state.rot;
-		orientation.col(0) = device_state.rot.col(2);
-		orientation.col(2) = -device_state.rot.col(0);
+		//! Buttons
+		button = chai3DGetButton(DEVICE_IDX);
 
-		// Updating Dummy Rotation
-		simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix_Original(resolution));
+		if (button == 1)
+		{
+			if (first_press)
+			{
+				get_offset();
+				first_press = false;
+			}
+			update_pose();
+		}
+		else
+		{
+			first_press = true;
+		}
 
-		//// Updating Cone Rotation
-		simSetObjectMatrix(tool_handler, -1, getSimTransformMatrix(orientation, resolution * device_state.pos));
+		// COUT
+		if (global_cnt % 100 == 0)
+		{
+			cout << endl << "Epoch: \t" << global_cnt << endl;
+			cout << "Button idx: \t" << button << endl;
+
+			cout << "Device T:\n" << device_state.T << endl;
+			cout << "Offset Matrix:" << endl << offset_transform << endl;
+			cout << "Tool transform" << endl << tool_transf << endl;
+		}
+
+
+
+		global_cnt++;
+
 	}
 
 
@@ -2164,18 +2182,67 @@ Eigen::Matrix3f getRotationMatrix(const float* euler)
 	return out;
 }
 
-float** eigen2SimMatrix(const Eigen::Matrix3f eigen)
+
+Eigen::Matrix4f simTransform2Eigen(const float* sim_T)
 {
-	float** temp;
+	Matrix4f T;
+	T <<	sim_T[0], sim_T[1], sim_T[2], sim_T[3],
+			sim_T[4], sim_T[5], sim_T[6], sim_T[7],
+			sim_T[8], sim_T[9], sim_T[10], sim_T[11],
+			0, 0, 0, 1;
+	return T;
+}
+
+float* eigen2SimTransform(const Matrix4f& eigen_T)
+{
+	float sim_T[12];
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 3; j++)
+		for (int j = 0; j < 4; j++)
 		{
-			temp[i][j] = eigen(i, j);
+			sim_T[4 * i + j] = eigen_T(i, j);
 		}
 	}
-	return temp;
+	return sim_T;
 }
+
+void update_pose(void)
+{
+	// Updating Dummy pose
+	//dummy_transf = device_state.T;
+	//simSetObjectMatrix(dummy_handler, -1, eigen2SimTransform(dummy_transf));
+
+	// Updating Cone pose
+	tool_transf = offset_transform * dummy_transf;
+	tool_transf.col(0) = dummy_transf.col(2);
+	tool_transf.col(2) = -dummy_transf.col(0);
+	//Vector3f tool_pos = tool_transf.block<3, 1>(0, 3);
+	//tool_pos *= resolution;
+	//tool_transf.block<3, 1>(0, 3) = tool_pos;
+	simSetObjectMatrix(tool_handler, -1, eigen2SimTransform(tool_transf));
+	//simSetObjectMatrix(tool_handler, -1, getSimTransformMatrix(tool_transf.block<3, 3>(0, 0).setIdentity(), tool_pos));
+}
+
+void get_offset(void)
+{
+	float offset_T[12];
+	float dummy_transf[12];
+	float tool_transf[12];
+	float dummy_transf_inv[12];
+
+	simGetObjectMatrix(dummy_handler, -1, dummy_transf);
+	simGetObjectMatrix(tool_handler, -1, tool_transf);
+
+	simCopyMatrix(dummy_transf, dummy_transf_inv);
+	simInvertMatrix(dummy_transf_inv);
+
+	//simMultiplyMatrices(tool_transf, dummy_transf_inv, offset_T); // Andrea
+	simMultiplyMatrices(dummy_transf_inv, tool_transf, offset_T); // Mirco
+	offset_transform = simTransform2Eigen(offset_T);
+}
+
+
+
 
 //Matrix3f& multiplyMatricesEigen(const Eigen)
 /** @}*/

@@ -22,9 +22,11 @@ public:
 	Eigen::Vector3f pos;
 	Eigen::Vector3f vel;
 	Eigen::Matrix3f rot;
+	Eigen::Matrix4f T;
 
 protected:
 	float* eigen2SimFloat(const Eigen::Vector3f eigen);
 	float** eigen2SimMatrix(const Eigen::Matrix3f eigen);
+
 };
 
