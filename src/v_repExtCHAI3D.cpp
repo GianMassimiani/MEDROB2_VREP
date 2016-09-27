@@ -1994,9 +1994,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	{
 		// Initialize the device
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
-			cout << "Init good" << endl;
-		else
-			cout << "Init no good" << endl;
+			cout << "Device found. Everithing OK ;)" << endl;
+		else // TODO, a return here
+			cerr << endl << "***************WARNING****************"
+			<< endl << "******** Device not found! :( ********" << endl << endl;
 
 		// NOTE: the reference frames of the real haptic device and of the virtual 
 		// haptic device coincide. The relation between the real and virtual world 
@@ -2069,20 +2070,20 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		}
 
 		// COUT
-		if (global_cnt % 100 == 0)
-		{
-			cout << endl << "Epoch: \t" << global_cnt << endl;
-			cout << "Button idx: \t" << button << endl;
+		//if (global_cnt % 100 == 0)
+		//{
+		//	cout << endl << "Epoch: \t" << global_cnt << endl;
+		//	cout << "Button idx: \t" << button << endl;
 
-			cout << "Device T:\n" << device_state.T << endl;
-			cout << "Dummy_transf:\n" << dummy_transf << endl;
-			cout << "temp_dummy_transf\n" << temp_dummy_transf[0] << "\t" << temp_dummy_transf[1] << "\t"
-				<< temp_dummy_transf[2] << "\t" << temp_dummy_transf[3] << "\n"
-				<< temp_dummy_transf[4] << "\t" << temp_dummy_transf[5] << "\t"
-				<< temp_dummy_transf[6] << "\t" << temp_dummy_transf[7] << "\n"
-				<< temp_dummy_transf[8] << "\t" << temp_dummy_transf[9] << "\t"
-				<< temp_dummy_transf[10] << "\t" << temp_dummy_transf[11] << "\n" << endl;
-		}
+		//	cout << "Device T:\n" << device_state.T << endl;
+		//	cout << "Dummy_transf:\n" << dummy_transf << endl;
+		//	cout << "temp_dummy_transf\n" << temp_dummy_transf[0] << "\t" << temp_dummy_transf[1] << "\t"
+		//		<< temp_dummy_transf[2] << "\t" << temp_dummy_transf[3] << "\n"
+		//		<< temp_dummy_transf[4] << "\t" << temp_dummy_transf[5] << "\t"
+		//		<< temp_dummy_transf[6] << "\t" << temp_dummy_transf[7] << "\n"
+		//		<< temp_dummy_transf[8] << "\t" << temp_dummy_transf[9] << "\t"
+		//		<< temp_dummy_transf[10] << "\t" << temp_dummy_transf[11] << "\n" << endl;
+		//}
 
 
 

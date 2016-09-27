@@ -1,17 +1,16 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
-  utility.cpp
   v_repExtCHAI3D.cpp
 src\v_repExtCHAI3D.cpp(142): warning C4838: la conversione da 'double' a 'simFloat' richiede una conversione verso un tipo di dati più piccolo
 src\v_repExtCHAI3D.cpp(142): warning C4305: 'inizializzazione': troncamento da 'double' a 'simFloat'
 src\v_repExtCHAI3D.cpp(1208): warning C4244: 'argomento': conversione da 'simFloat' a 'unsigned int'. Possibile perdita di dati.
 src\v_repExtCHAI3D.cpp(1209): warning C4244: 'argomento': conversione da 'simFloat' a 'unsigned int'. Possibile perdita di dati.
-src\v_repExtCHAI3D.cpp(2008): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
-src\v_repExtCHAI3D.cpp(2013): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
-src\v_repExtCHAI3D.cpp(2215): warning C4101: 'dummy_transf_inv': variabile locale senza riferimenti
-src\v_repExtCHAI3D.cpp(2212): warning C4101: 'offset_T': variabile locale senza riferimenti
+src\v_repExtCHAI3D.cpp(2009): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
+src\v_repExtCHAI3D.cpp(2014): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
+src\v_repExtCHAI3D.cpp(2216): warning C4101: 'dummy_transf_inv': variabile locale senza riferimenti
+src\v_repExtCHAI3D.cpp(2213): warning C4101: 'offset_T': variabile locale senza riferimenti
      Creazione della libreria ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
   Generazione codice in corso...
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\v_repextchai3d.cpp(2141): warning C4172: 
+c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\v_repextchai3d.cpp(2142): warning C4172: verrà restituito l'indirizzo del valore : transform_matrix temporaneo o della variabile locale
 c:\users\istin\documents\chai3d\modules\medrob2_vrep\devicestate.cpp(82): warning C4172: verrà restituito l'indirizzo del valore : transform_matrix temporaneo o della variabile locale
 c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\v_repextchai3d.cpp(1840): warning C4715: 'chai3DGetButton': non tutti i percorsi di controllo restituiscono un valore
   Generazione codice terminata
