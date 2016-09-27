@@ -66,6 +66,7 @@ using namespace chai3d;
 #define PLUGIN_VERSION 1
 
 #include "../DeviceState.h" //! Improve
+#include "utility.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
