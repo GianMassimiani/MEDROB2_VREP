@@ -150,6 +150,7 @@ int button;
 bool first_press = true;
 int global_cnt = 0;
 
+Vector3d global_device_force(0.0, 0.0, 0.0);
 Matrix4f offset_transform;
 Vector3f lin_offset;
 Matrix3f rot_offset;
@@ -832,7 +833,8 @@ void hapticLoop()
 		// add constraint forces and apply to each device
 		for (const auto& cursor : Cursors)
 		{
-			cursor.second->Tool->addDeviceGlobalForce(cursor.second->Force);
+			//cursor.second->Tool->addDeviceGlobalForce(cursor.second->Force); // Global forces here!
+			cursor.second->Tool->setDeviceGlobalForce(global_device_force);
 			cursor.second->Tool->applyToDevice();
 		}
 
@@ -1993,7 +1995,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	{
 		// Initialize the device
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
-			cout << "Device found. Everithing OK ;)" << endl;
+			cout << "Device found. Everithing OK ;)" << endl << endl;
 		else // TODO, a return here
 			cerr << endl << "***************WARNING****************"
 			<< endl << "******** Device not found! :( ********" << endl << endl;
@@ -2070,9 +2072,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		eigen2SimTransf(dummy_T, sim_dummy_T);
 		simSetObjectMatrix(dummy_handler, -1, sim_dummy_T);
 		
-
 		//! Buttons
 		button = chai3DGetButton(DEVICE_IDX);
+		Vector3d f;
 
 		switch (button)
 		{
@@ -2083,6 +2085,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			update_pose();
+			global_device_force << 1.5, 0, 0;
 			break;
 		case 2:
 			if (first_press)
@@ -2093,6 +2096,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			update_rot();
+			global_device_force << 0.0, 1.5, 0;
 			break;
 		case 3:
 			first_press = true;
@@ -2102,9 +2106,12 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
+
+			global_device_force.setZero();
 		}
 
 		// COUT
+		want_to_print = true;
 		if (global_cnt % 100 == 0 && want_to_print)
 		{
 			cout << endl << "Epoch: \t" << global_cnt << endl;
