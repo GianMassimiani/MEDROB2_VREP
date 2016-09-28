@@ -142,8 +142,10 @@ simFloat tool_size[3] = {
 	(1.5 + TOOL_RADIUS) / 3 };
 simInt dummy_handler;
 simInt tool_handler;
+simInt tool_tip_handler;
 simFloat resolution = 5.0;
 
+bool want_to_print = false;
 int button;
 bool first_press = true;
 int global_cnt = 0;
@@ -152,15 +154,15 @@ Matrix4f offset_transform;
 Vector3f lin_offset;
 Matrix3f rot_offset;
 
-Matrix4f tool_transf;
-Matrix4f dummy_transf;
+Matrix4f dummy_T;
 
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
 //! ------------------ FUNCTIONS DECLARATIONS ----------------------//
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
-
+void update_rot(void);
+void update_pos_penetration(void); // o.O
 void update_pose(void);
 void get_offset(void);
 
@@ -2009,21 +2011,25 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Create a cursor (cone) to be associated to the dummy. 
 		// A virtual coupling is implemented between the dummy and the tool.
 		tool_handler = simCreatePureShape(3, 31, tool_size, 0.01, NULL);
-
 		simSetObjectParent(tool_handler, -1, true);
+
+		// Create a "point puzzo" only to apply a rotation to the tip of the
+		// tool.
+		tool_tip_handler = simCreateDummy(0.01, NULL);
+		simSetObjectParent(tool_tip_handler, tool_handler, true);
 
 		// Read the state of the haptic device (position, rotation, velocity)
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
 
-		// Updating Dummy pose
+		// Set Dummy pose
 		Matrix4f temp = device_state.T;
 		temp.block<3, 1>(0, 3) *= resolution;
 		float scaled_device_T[12];
 		eigen2SimTransf(temp, scaled_device_T);
 		simSetObjectMatrix(dummy_handler, -1, scaled_device_T);
 
-		//// Updating Cone pose (PLACEHOLDER)
+		// Set Cone pose
 		float scaled_tool_T[12];
 		Matrix3f orientation;
 		orientation = device_state.rot;
@@ -2034,6 +2040,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		temp.block<3, 1>(0, 3) = resolution * device_state.pos;
 		eigen2SimTransf(temp, scaled_tool_T);
 		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
+
+		// Set Tool-tip position
+		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
+		simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
 
 	}
 
@@ -2052,43 +2062,57 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
 
-		dummy_transf = device_state.T; 
-		float temp_dummy_transf[12];
-		eigen2SimTransf(device_state.T, temp_dummy_transf);
-		simSetObjectMatrix(dummy_handler, -1, temp_dummy_transf);
+		float sim_dummy_T[12];
+
+		// Scaling by resolution
+		dummy_T = device_state.T;
+		dummy_T.block<3, 1>(0, 3) *= resolution;
+		eigen2SimTransf(dummy_T, sim_dummy_T);
+		simSetObjectMatrix(dummy_handler, -1, sim_dummy_T);
 		
 
 		//! Buttons
 		button = chai3DGetButton(DEVICE_IDX);
 
-		if (button == 1)
+		switch (button)
 		{
+		case 1:
 			if (first_press)
 			{
 				get_offset();
 				first_press = false;
 			}
 			update_pose();
-		}
-		else
-		{
+			break;
+		case 2:
+			if (first_press)
+			{
+				simSetObjectParent(tool_tip_handler, -1, true);
+				simSetObjectParent(tool_handler, tool_tip_handler, true);
+				get_offset();
+				first_press = false;
+			}
+			update_rot();
+			break;
+		case 3:
 			first_press = true;
+			cout << "Ciao! Sono il Porcodio numero 3! \nRicorda, qua ci va il VF" << endl; 
+			break;
+		default:
+			first_press = true;
+			simSetObjectParent(tool_handler, -1, true);
+			simSetObjectParent(tool_tip_handler, tool_handler, true);
 		}
 
 		// COUT
-		if (global_cnt % 100 == 0)
+		if (global_cnt % 100 == 0 && want_to_print)
 		{
 			cout << endl << "Epoch: \t" << global_cnt << endl;
 			cout << "Button idx: \t" << button << endl;
 
-			cout << "Device T:\n" << device_state.T << endl;
-			cout << "Rot offset:\n" << rot_offset << endl;
+			cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
 		}
-
-
-
 		global_cnt++;
-
 	}
 
 
@@ -2118,32 +2142,54 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 // ------------------------- FUNCTIONS DEFINITIONS --------------------------//
 // ------------------------------------------------------------------------- //
 // ------------------------------------------------------------------------- //
+void update_rot(void)
+{
+
+	Matrix4f tool_tip_T, temp;
+	Matrix4f dummy_T;
+	float sim_tool_tip_T[12];
+	float sim_tool_tip_angles[3];
+	float sim_dummy_T[12];
+
+	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
+	sim2EigenTransf(sim_dummy_T, dummy_T);
+
+	tool_tip_T = dummy_T;
+	tool_tip_T.block<3, 3>(0, 0) = tool_tip_T.block<3, 3>(0, 0) * rot_offset;
+
+	eigen2SimTransf(tool_tip_T, sim_tool_tip_T);
+	simGetEulerAnglesFromMatrix(sim_tool_tip_T, sim_tool_tip_angles);
+	simSetObjectOrientation(tool_tip_handler, -1, sim_tool_tip_angles);
+}
+void update_pos_penetration(void)
+{
+
+}
+
 void update_pose(void)
 {
 	Vector3f tool_pos;
 	Matrix3f tool_rot;
-	Matrix4f tool_T;
+	Matrix4f tool_T, dummy_T;
+	float sim_tool_T[12];
+	float sim_dummy_T[12];
 
-	tool_pos = device_state.pos + lin_offset;
-	tool_rot = device_state.rot * rot_offset;
+	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
+	sim2EigenTransf(sim_dummy_T, dummy_T);
+
+	// tool_pos in this way is already multiplied by resolution
+	// --> in advancing_running
+	tool_pos = dummy_T.block<3,1>(0,3) + lin_offset; 
+	tool_rot = dummy_T.block<3,3>(0, 0) * rot_offset;
 
 	tool_T.block<3, 3>(0, 0) = tool_rot;
 	tool_T.block<3, 1>(0, 3) = tool_pos;
-	float temp_tool_T[12];
-	eigen2SimTransf(tool_T, temp_tool_T);
-	simSetObjectMatrix(tool_handler, -1, temp_tool_T);
+	eigen2SimTransf(tool_T, sim_tool_T);
+	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
 }
 
 void get_offset(void)
 {
-	float offset_T[12];
-	float dummy_transf[12];
-	float tool_transf[12];
-	float dummy_transf_inv[12];
-
-	simGetObjectMatrix(dummy_handler, -1, dummy_transf);
-	simGetObjectMatrix(tool_handler, -1, tool_transf);
-
 	Matrix4f dummy_T;
 	Matrix4f tool_T;
 	Vector3f tool_pos;
@@ -2151,12 +2197,19 @@ void get_offset(void)
 	Matrix3f dummy_rot;
 	Matrix3f tool_rot;
 	
+	float sim_dummy_T[12];
+	float sim_tool_T[12];
+
+	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
+	simGetObjectMatrix(tool_handler, -1, sim_tool_T);
+	
 	//! Position
-	sim2EigenTransf(dummy_transf, dummy_T);
-	sim2EigenTransf(tool_transf, tool_T);
+	sim2EigenTransf(sim_dummy_T, dummy_T);
+	sim2EigenTransf(sim_tool_T, tool_T);
 	dummy_pos = dummy_T.block<3, 1>(0, 3);
 	tool_pos = tool_T.block<3, 1>(0, 3);
 
+	// already scaled by resolution
 	lin_offset = tool_pos - dummy_pos;
 
 	//! Orientation
@@ -2164,7 +2217,6 @@ void get_offset(void)
 	tool_rot = tool_T.block<3, 3>(0, 0);
 
 	rot_offset = dummy_rot.transpose() * tool_rot;
-
 }
 
 

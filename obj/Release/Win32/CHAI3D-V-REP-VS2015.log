@@ -2,15 +2,14 @@
   v_repExtCHAI3D.cpp
 src\v_repExtCHAI3D.cpp(142): warning C4838: la conversione da 'double' a 'simFloat' richiede una conversione verso un tipo di dati più piccolo
 src\v_repExtCHAI3D.cpp(142): warning C4305: 'inizializzazione': troncamento da 'double' a 'simFloat'
-src\v_repExtCHAI3D.cpp(1205): warning C4244: 'argomento': conversione da 'simFloat' a 'unsigned int'. Possibile perdita di dati.
-src\v_repExtCHAI3D.cpp(1206): warning C4244: 'argomento': conversione da 'simFloat' a 'unsigned int'. Possibile perdita di dati.
-src\v_repExtCHAI3D.cpp(2006): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
-src\v_repExtCHAI3D.cpp(2011): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
-src\v_repExtCHAI3D.cpp(2142): warning C4101: 'dummy_transf_inv': variabile locale senza riferimenti
-src\v_repExtCHAI3D.cpp(2139): warning C4101: 'offset_T': variabile locale senza riferimenti
+src\v_repExtCHAI3D.cpp(1207): warning C4244: 'argomento': conversione da 'simFloat' a 'unsigned int'. Possibile perdita di dati.
+src\v_repExtCHAI3D.cpp(1208): warning C4244: 'argomento': conversione da 'simFloat' a 'unsigned int'. Possibile perdita di dati.
+src\v_repExtCHAI3D.cpp(2008): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
+src\v_repExtCHAI3D.cpp(2013): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
+src\v_repExtCHAI3D.cpp(2018): warning C4305: 'argomento': troncamento da 'double' a 'simFloat'
      Creazione della libreria ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
   Generazione codice in corso...
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\v_repextchai3d.cpp(1837): warning C4715: 'chai3DGetButton': non tutti i percorsi di controllo restituiscono un valore
+c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\v_repextchai3d.cpp(1839): warning C4715: 'chai3DGetButton': non tutti i percorsi di controllo restituiscono un valore
   Generazione codice terminata
   CHAI3D-V-REP-VS2015.vcxproj -> C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll
   CHAI3D-V-REP-VS2015.vcxproj -> ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.pdb (Full PDB)
