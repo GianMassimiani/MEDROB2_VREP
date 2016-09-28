@@ -66,6 +66,7 @@ using namespace chai3d;
 #define PLUGIN_VERSION 1
 
 #include "../DeviceState.h" //! Improve
+#include "../utility.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -130,13 +131,6 @@ double LowestStiffness = -1.0;
 // ------------------------------------------------------------------------- //
 
 
-//struct DevState
-//{
-//	Eigen::Vector3f pos;
-//	Eigen::Vector3f vel;
-//	Eigen::Matrix3d rot;
-//} device_state;
-
 DeviceState device_state;
 #define DEVICE_IDX 0
 #define TOOL_RADIUS 0.005
@@ -148,21 +142,34 @@ simFloat tool_size[3] = {
 	(1.5 + TOOL_RADIUS) / 3 };
 simInt dummy_handler;
 simInt tool_handler;
-simFloat resolution = 2.0;
+simFloat resolution = 5.0;
 
-Matrix3f dummy_tool_rotation_offset;
+int button;
+bool first_press = true;
+int global_cnt = 0;
+
+Matrix4f offset_transform;
+Vector3f lin_offset;
+Matrix3f rot_offset;
+
+Matrix4f tool_transf;
+Matrix4f dummy_transf;
+
+Matrix4f initial_dummy_pose_matrix;
 
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
 //! ------------------ UTILITIES DECLARATIONS ----------------------//
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
-float* multiplyByScalar(float* a, float b);
-float* getEulerAngles(Eigen::Matrix3f rot);
-float** eigen2SimMatrix(const Eigen::Matrix3f eigen);
-Eigen::Matrix3f getRotationMatrix(const float* euler);
+void eigen2SimTransform(const Matrix4f &eigen_T, float* sim_T);
+Eigen::Matrix4f simTransform2Eigen(const float* sim_T);
+float* getSimTransformMatrix(Eigen::Matrix3f rot, Eigen::Vector3f pos);
 
-
+void update_pose(void);
+void get_offset(void);
+void automaticUpdateDummyPose(simInt);
+void update_pose_2(void);
 
 
 //---------------------------------------------------------------------------
@@ -1794,6 +1801,11 @@ void chai3DReadState(simInt device_idx, DeviceState& state)
 		state.vel(0) = (float)vel.x();
 		state.vel(1) = (float)vel.y();
 		state.vel(2) = (float)vel.z();
+
+		state.T.block<3, 3>(0, 0) = temp;
+		state.T(0, 3) = state.pos(0);
+		state.T(1, 3) = state.pos(1);
+		state.T(2, 3) = state.pos(2);
 	}
 }
 
@@ -1984,9 +1996,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	{
 		// Initialize the device
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
-			cout << "Init good" << endl;
-		else
-			cout << "Init no good" << endl;
+			cout << "Device found. Everithing OK ;)" << endl;
+		else // TODO, a return here
+			cerr << endl << "***************WARNING****************"
+			<< endl << "******** Device not found! :( ********" << endl << endl;
 
 		// NOTE: the reference frames of the real haptic device and of the virtual 
 		// haptic device coincide. The relation between the real and virtual world 
@@ -2008,14 +2021,16 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
 
-		// Impose to the DUMMY the same pose of the haptic device 
-		simSetObjectPosition(dummy_handler, -1, device_state.getSimPos());
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		// Updating Dummy pose
+		simSetObjectMatrix(dummy_handler, -1, device_state.getSimTransformMatrix_Original(resolution));
+		initial_dummy_pose_matrix = device_state.T; 
 
-		//// TOOL pose
-		simSetObjectPosition(tool_handler, -1, device_state.getSimPos());
-		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
-
+		//// Updating Cone pose (PLACEHOLDER)
+		Matrix3f orientation;
+		orientation = device_state.rot;
+		orientation.col(0) = device_state.rot.col(2);
+		orientation.col(2) = -device_state.rot.col(0);
+		simSetObjectMatrix(tool_handler, -1, getSimTransformMatrix(orientation, resolution * device_state.pos));
 
 	}
 
@@ -2034,20 +2049,55 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
 
-		// Updating position
-		float* dummy_pos = device_state.getSimPos();
-		dummy_pos = multiplyByScalar(dummy_pos, resolution);
-		simSetObjectPosition(dummy_handler, -1, dummy_pos);
-		simSetObjectPosition(tool_handler, -1, dummy_pos);
+		dummy_transf = device_state.T;
+		float temp_dummy_transf[12];
+		eigen2SimTransform(device_state.T, temp_dummy_transf);
+		simSetObjectMatrix(dummy_handler, -1, temp_dummy_transf);
 
-		//float offset_tool[3] = { 0.0,0.0, -tool_size[2] / 2 };
-		//simSetObjectPosition(tool_handler, dummy_handler, offset_tool);
 
-		// Updating Dummy Rotation
-		simSetObjectOrientation(dummy_handler, -1, device_state.getEulerAngles());
+		//! Buttons
+		button = chai3DGetButton(DEVICE_IDX);
 
-		//// Updating Cone Rotation
-		simSetObjectOrientation(tool_handler, -1, device_state.getEulerAngles());
+		if (button == 1)
+		{
+			if (first_press)
+			{
+				get_offset();
+				first_press = false;
+			}
+			update_pose();
+		}
+		else
+		{
+			first_press = true;
+		}
+
+		// Automatic update of the dummy pose
+		automaticUpdateDummyPose(dummy_handler);
+		// Also update the tool pose
+		update_pose_2();
+
+
+		// COUT
+		//if (global_cnt % 100 == 0)
+		//{
+		//	cout << endl << "Epoch: \t" << global_cnt << endl;
+		//	cout << "Button idx: \t" << button << endl;
+
+		//	cout << "Device T:\n" << device_state.T << endl;
+		//	cout << "Dummy_transf:\n" << dummy_transf << endl;
+		//	cout << "temp_dummy_transf\n" << temp_dummy_transf[0] << "\t" << temp_dummy_transf[1] << "\t"
+		//		<< temp_dummy_transf[2] << "\t" << temp_dummy_transf[3] << "\n"
+		//		<< temp_dummy_transf[4] << "\t" << temp_dummy_transf[5] << "\t"
+		//		<< temp_dummy_transf[6] << "\t" << temp_dummy_transf[7] << "\n"
+		//		<< temp_dummy_transf[8] << "\t" << temp_dummy_transf[9] << "\t"
+		//		<< temp_dummy_transf[10] << "\t" << temp_dummy_transf[11] << "\n" << endl;
+		//}
+
+
+
+		global_cnt++;
+
 	}
 
 
@@ -2077,63 +2127,208 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 // ------------------------- UTILITIES DEFINITIONS --------------------------//
 // ------------------------------------------------------------------------- //
 // ------------------------------------------------------------------------- //
-float* multiplyByScalar(float* a, float b)
+
+
+float* getSimTransformMatrix(Eigen::Matrix3f rot, Eigen::Vector3f pos)
 {
-	unsigned int const size = sizeof(a);
-	float c[size];
-	for (int i = 0; i < size; i++)
-	{
-		c[i] = a[i] * b;
-	}
-	return c;
+	simFloat transform_matrix[12];
+
+	transform_matrix[0] = rot(0, 0);
+	transform_matrix[1] = rot(0, 1);
+	transform_matrix[2] = rot(0, 2);
+	transform_matrix[3] = pos(0);
+
+	transform_matrix[4] = rot(1, 0);
+	transform_matrix[5] = rot(1, 1);
+	transform_matrix[6] = rot(1, 2);
+	transform_matrix[7] = pos(1);
+
+	transform_matrix[8] = rot(2, 0);
+	transform_matrix[9] = rot(2, 1);
+	transform_matrix[10] = rot(2, 2);
+	transform_matrix[11] = pos(2);
+
+	return transform_matrix;
 }
 
-float* getEulerAngles(Eigen::Matrix3f rot)
+Eigen::Matrix4f simTransform2Eigen(const float* sim_T)
 {
-	float euler_angles[3];
-	euler_angles[0] = atan2(rot(2, 1), rot(2, 2));
-	euler_angles[1] = asin(rot(2, 0));
-	euler_angles[2] = -atan2(rot(1, 0), rot(0, 0));
-
-	return euler_angles;
+	Matrix4f T;
+	T << sim_T[0], sim_T[1], sim_T[2], sim_T[3],
+		sim_T[4], sim_T[5], sim_T[6], sim_T[7],
+		sim_T[8], sim_T[9], sim_T[10], sim_T[11],
+		0, 0, 0, 1;
+	return T;
 }
 
-Eigen::Matrix3f getRotationMatrix(const float* euler)
+void eigen2SimTransform(const Matrix4f &eigen_T, float* sim_T)
 {
-	Matrix3f rot_X;
-	Matrix3f rot_Y;
-	Matrix3f rot_Z;
-
-	rot_X <<
-		1, 0, 0,
-		0, cos(euler[0]), -sin(euler[0]),
-		0, sin(euler[0]), cos(euler[0]);
-
-	rot_Y <<
-		cos(euler[1]), 0, sin(euler[1]),
-		0, 1, 0,
-		-sin(euler[1]), 0, cos(euler[1]);
-	rot_Z <<
-		cos(euler[2]), -sin(euler[2]), 0,
-		sin(euler[2]), cos(euler[2]), 0,
-		0, 0, 1;
-	Matrix3f out;
-	out = (rot_X * rot_Y * rot_Z);
-	return out;
-}
-
-float** eigen2SimMatrix(const Eigen::Matrix3f eigen)
-{
-	float** temp;
 	for (int i = 0; i < 3; i++)
 	{
-		for (int j = 0; j < 3; j++)
+		for (int j = 0; j < 4; j++)
 		{
-			temp[i][j] = eigen(i, j);
+			sim_T[4 * i + j] = eigen_T(i, j);
 		}
 	}
-	return temp;
 }
+
+void update_pose(void)
+{
+	// Updating Dummy pose
+	//dummy_transf = device_state.T;
+	//simSetObjectMatrix(dummy_handler, -1, eigen2SimTransform(dummy_transf));
+
+	//// Updating Cone pose
+	//tool_transf = offset_transform * dummy_transf;
+	//auto temp = tool_transf;
+	//tool_transf.col(0) = temp.col(2);
+	//tool_transf.col(2) = -temp.col(0);
+	//Vector3f tool_pos = tool_transf.block<3, 1>(0, 3);
+	//tool_pos *= resolution;
+	//tool_transf.block<3, 1>(0, 3) = tool_pos;
+
+	//float temp_tool_T[12];
+	//eigen2SimTransform(tool_transf, temp_tool_T);
+	//simSetObjectMatrix(tool_handler, -1, temp_tool_T);
+
+
+	//! NEW
+	Vector3f tool_pos;
+	Matrix3f tool_rot;
+	Matrix4f tool_T;
+
+	tool_pos = device_state.pos + lin_offset;
+	tool_rot = rot_offset * device_state.rot.transpose();
+
+	auto temp = tool_rot;
+
+	tool_rot.col(0) = temp.col(2);
+	tool_rot.col(2) = -temp.col(0);
+
+	//cout << endl << "******************" << endl;
+	//cout << "tool_pos = device_state.pos + lin_offset" << endl << tool_pos << endl;
+	//cout << "device_state.pos\n" << device_state.pos << endl;
+	//cout << "lin_offset\n" << lin_offset << endl;
+
+	tool_T.block<3, 3>(0, 0) = tool_rot;
+	tool_T.block<3, 1>(0, 3) = tool_pos;
+	float temp_tool_T[12];
+	eigen2SimTransform(tool_T, temp_tool_T);
+	simSetObjectMatrix(tool_handler, -1, temp_tool_T);
+}
+
+void get_offset(void)
+{
+	float offset_T[12];
+	float dummy_transf[12];
+	float tool_transf[12];
+	float dummy_transf_inv[12];
+
+	simGetObjectMatrix(dummy_handler, -1, dummy_transf);
+	simGetObjectMatrix(tool_handler, -1, tool_transf);
+
+	////! Past
+	//simCopyMatrix(dummy_transf, dummy_transf_inv);
+	//simInvertMatrix(dummy_transf_inv);
+
+	////simMultiplyMatrices(tool_transf, dummy_transf_inv, offset_T); // Andrea
+	//simMultiplyMatrices(dummy_transf_inv, tool_transf, offset_T); // Mirco
+	//offset_transform = simTransform2Eigen(offset_T);
+
+	//! Position
+	Vector3f tool_pos;
+	Vector3f dummy_pos;
+
+	dummy_pos = simTransform2Eigen(dummy_transf).block<3, 1>(0, 3);
+	tool_pos = simTransform2Eigen(tool_transf).block<3, 1>(0, 3);
+
+	lin_offset = tool_pos - dummy_pos;
+
+	//! Orientation
+	Matrix3f dummy_rot;
+	Matrix3f tool_rot;
+
+	dummy_rot = simTransform2Eigen(dummy_transf).block<3, 3>(0, 0);
+	tool_rot = simTransform2Eigen(tool_transf).block<3, 3>(0, 0);
+
+	rot_offset = tool_rot * dummy_rot.transpose();
+
+
+
+
+}
+
+
+void automaticUpdateDummyPose(simInt dummy_handler) {
+
+	float period = 100.0;
+	float radius = 0.2;
+	float angle = 0; 
+	Matrix4f current_pose_matrix;
+	Matrix3f rot_x;
+	Matrix3f rot_y;
+	Matrix3f rot_z;
+
+	current_pose_matrix.setIdentity();
+
+	// get simulation time
+	double time = simGetSimulationTime();
+
+	// determine rotation angle
+	angle = 2 * time*M_PI / period;
+
+	// compute current position
+	current_pose_matrix(0, 3) = resolution * (initial_dummy_pose_matrix(0, 3) + radius * cos(angle));
+	current_pose_matrix(1, 3) = resolution * (initial_dummy_pose_matrix(1, 3) + radius * sin(angle));
+	current_pose_matrix(2, 3) = resolution * (initial_dummy_pose_matrix(2, 3) + 0.05 * cos(2 * angle));
+
+	// compute current orientation
+	
+	rot_x <<	1,			0,			 0,
+				0, cos(angle), -sin(angle),
+				0, sin(angle),  cos(angle);
+
+	rot_y <<	cos(angle),  0, sin(angle),
+				0,			 1,			0,
+				-sin(angle), 0, cos(angle);
+
+	rot_z <<	cos(angle), -sin(angle), 0,
+				sin(angle),	 cos(angle), 0,
+				0,			 0,			 1;
+				
+	current_pose_matrix.block<3, 3>(0, 0) = current_pose_matrix.block<3, 3>(0, 0) * rot_x * rot_y * rot_z;
+
+	// convert into simFloat variable
+	simFloat sim_current_pose_matrix[12];
+	eigen2SimTransform(current_pose_matrix, sim_current_pose_matrix);
+
+	// impose the pose to the dummy
+	simSetObjectMatrix(dummy_handler, -1, sim_current_pose_matrix);
+}
+
+void update_pose_2(void)
+{
+	Vector3f tool_pos;
+	Matrix3f tool_rot;
+	Matrix4f tool_T;
+	simFloat temp_tool_T[12];
+	
+	simGetObjectMatrix(dummy_handler, -1, temp_tool_T);
+	sim2EigenTransf(temp_tool_T, tool_T);
+
+	tool_pos += tool_T.block<3,1>(0,3) + lin_offset;
+
+	tool_rot = rot_offset * tool_T.block<3, 3>(0, 0).transpose();
+
+	auto temp = tool_T;
+
+	tool_T.col(0) = temp.col(2);
+	tool_T.col(2) = -temp.col(0);
+
+	eigen2SimTransform(tool_T, temp_tool_T);
+	simSetObjectMatrix(tool_handler, -1, temp_tool_T);
+}
+
 
 //Matrix3f& multiplyMatricesEigen(const Eigen)
 /** @}*/
