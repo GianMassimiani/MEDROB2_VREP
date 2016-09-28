@@ -154,6 +154,7 @@ Vector3d global_device_force(0.0, 0.0, 0.0);
 Matrix4f offset_transform;
 Vector3f lin_offset;
 Matrix3f rot_offset;
+Matrix3f force_offset_rot;
 
 Matrix4f dummy_T;
 
@@ -166,6 +167,7 @@ void update_rot(void);
 void update_pos_penetration(void); // o.O
 void update_pose(void);
 void get_offset(void);
+void compute_global_force(void);
 
 
 
@@ -2085,7 +2087,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			update_pose();
-			global_device_force << 1.5, 0, 0;
+			compute_global_force();
 			break;
 		case 2:
 			if (first_press)
@@ -2096,11 +2098,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			update_rot();
-			global_device_force << 0.0, 1.5, 0;
 			break;
 		case 3:
 			first_press = true;
-			cout << "Ciao! Sono il Porcodio numero 3! \nRicorda, qua ci va il VF" << endl; 
 			break;
 		default:
 			first_press = true;
@@ -2117,7 +2117,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			cout << endl << "Epoch: \t" << global_cnt << endl;
 			cout << "Button idx: \t" << button << endl;
 
-			cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
+			//cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
 		}
 		global_cnt++;
 	}
@@ -2170,7 +2170,7 @@ void update_rot(void)
 }
 void update_pos_penetration(void)
 {
-
+	return; //placeholder
 }
 
 void update_pose(void)
@@ -2224,8 +2224,43 @@ void get_offset(void)
 	tool_rot = tool_T.block<3, 3>(0, 0);
 
 	rot_offset = dummy_rot.transpose() * tool_rot;
+	force_offset_rot = dummy_rot * tool_rot.transpose();
 }
 
+
+void compute_global_force(void)
+{
+	Vector3f tool_tip_F;
+	Vector3d temp_v;
+	Matrix4f tool_T, dummy_T;
+	Matrix3f tool_R, dummy_R;
+	Matrix3f rot_Y;
+	rot_Y << 0, 0, -1,
+		0, 1, 0,
+		0, 0, 1;
+
+	float sim_tool_T[12];
+	float sim_dummy_T[12];
+
+	simGetObjectMatrix(tool_handler, -1, sim_tool_T);
+	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
+	sim2EigenTransf(sim_tool_T, tool_T);
+	sim2EigenTransf(sim_dummy_T, dummy_T);
+	tool_R = tool_T.block<3, 3>(0, 0);
+	dummy_R = dummy_T.block<3, 3>(0, 0);
+
+	//tool_tip_F = tool_R.transpose() * Vector3f::UnitZ();
+	tool_tip_F = tool_R.col(2); // forza lungo l'asse z del tool (sempre)
+	//tool_tip_F = dummy_R.col(0); // forza lungo l'asse x del dummy (sempre)
+
+
+	//tool_tip_F = rot_offset * tool_tip_F;
+	temp_v(0) = (double)tool_tip_F(0);
+	temp_v(1) = (double)tool_tip_F(1);
+	temp_v(2) = (double)tool_tip_F(2);
+
+	global_device_force = temp_v;
+}
 
 
 
