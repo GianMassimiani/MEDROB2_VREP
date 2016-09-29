@@ -45,6 +45,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <iostream>
+#include <queue>
+#include <vector>
 using namespace std;
 
 #include "v_repExtCHAI3D.h"
@@ -144,6 +146,8 @@ simInt dummy_handler;
 simInt tool_handler;
 simInt tool_tip_handler;
 simFloat resolution = 5.0;
+simInt vel_graph_handler;
+simInt force_graph_handler;
 
 bool want_to_print = false;
 int button;
@@ -160,6 +164,12 @@ Vector3f tool_vel, tool_omega;
 
 Matrix4f dummy_T;
 
+//! Velocity Filtering
+const int buffer_vel_size = 33;
+typedef std::vector<Eigen::Vector3f> Vector3fVector;
+std::vector<Eigen::Vector3f> device_vel_vector (buffer_vel_size);
+std::vector<Eigen::Vector3f> tool_vel_vector(buffer_vel_size);
+
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
 //! ------------------ FUNCTIONS DECLARATIONS ----------------------//
@@ -170,6 +180,7 @@ void update_pos_penetration(void); // o.O
 void update_pose(void);
 void get_offset(void);
 void compute_global_force(void);
+void filter_velocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init);
 
 
 
@@ -2017,16 +2028,25 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Create a cursor (cone) to be associated to the dummy. 
 		// A virtual coupling is implemented between the dummy and the tool.
 		tool_handler = simCreatePureShape(3, 31, tool_size, 2.01, NULL);
+		// TODO: include inertia values -> FULL VREP_LIB REQUIRED
+		//simComputeMassAndInertia(tool_handler, 7860); 
 		simSetObjectParent(tool_handler, -1, true);
 
 		// Create a "point puzzo" only to apply a rotation to the tip of the
 		// tool.
 		tool_tip_handler = simCreateDummy(0.01, NULL);
+		simSetObjectIntParameter(tool_tip_handler, 10, 0); // not visible
 		simSetObjectParent(tool_tip_handler, tool_handler, true);
+
+		// Graph
+		vel_graph_handler = simGetObjectHandle("Vel_graph");
+		force_graph_handler = simGetObjectHandle("Force_graph");
 
 		// Read the state of the haptic device (position, rotation, velocity)
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
+		filter_velocity(device_vel_vector, device_state.vel, device_state.vel, true);
+		cout << endl << "Filtered Vel:\n" << device_state.vel << endl;
 
 		// Set Dummy pose
 		Matrix4f temp = device_state.T;
@@ -2046,6 +2066,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		temp.block<3, 1>(0, 3) = resolution * device_state.pos;
 		eigen2SimTransf(temp, scaled_tool_T);
 		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
+
+		Vector3f zero_tmp;
+		zero_tmp.setZero();
+		filter_velocity(device_vel_vector, zero_tmp, zero_tmp, true);
 
 		// Set Tool-tip position
 		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
@@ -2067,6 +2091,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Read the state of the haptic device 
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
+		filter_velocity(device_vel_vector, device_state.vel, device_state.vel, false);
+
+		float sim_tool_vel[3];
+		float sim_tool_omega[3];
 
 		float sim_dummy_T[12];
 
@@ -2088,8 +2116,19 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				simSetObjectParent(tool_handler, -1, true);
 				simSetObjectParent(tool_tip_handler, tool_handler, true);
 				get_offset();
+
+				// clear tool_vel buffer
+				Vector3f zero_tmp;
+				zero_tmp.setZero();
+				filter_velocity(device_vel_vector, zero_tmp, zero_tmp, true);
+
 				first_press = false;
 			}
+			simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
+			sim2EigenVec3f(sim_tool_vel, tool_vel);
+			sim2EigenVec3f(sim_tool_omega, tool_omega);
+			filter_velocity(tool_vel_vector, tool_vel, tool_vel, false);
+
 			update_pose();
 			compute_global_force();
 			break;
@@ -2117,21 +2156,13 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// COUT
 		want_to_print = true;
 
-		float sim_tool_vel[3];
-		float sim_tool_omega[3];
-
-		simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
-		sim2EigenVec3f(sim_tool_vel, tool_vel);
-		sim2EigenVec3f(sim_tool_omega, tool_omega);
-
-
 		if (global_cnt % 100 == 0 && want_to_print)
 		{
 			cout << endl << "Epoch: \t" << global_cnt << endl;
 			cout << "Button idx: \t" << button << endl;
 
+			device_state.print();
 			cout << "Tool linear velocity\n" << tool_vel << endl;
-			cout << "Device linear velocity\n" << device_state.vel << endl;
 			cout << "T_V - D_V\n" << tool_vel - device_state.vel << endl;
 
 			cout << "Inertia F\n" << inertia_F << endl;
@@ -2265,14 +2296,49 @@ void compute_global_force(void)
 
 	Matrix3f K_inertia;
 	K_inertia.setIdentity();
-	K_inertia << 1, 0, 0,
-		0, 1, 0,
-		0, 0, 2.5;
+	K_inertia << 1.0, 0, 0,
+		0, 1.0, 0,
+		0, 0, 1.0;
 	inertia_F = K_inertia * (device_state.vel - tool_vel);
+
 
 	temp_v = inertia_F.cast<double>();
 
 	global_device_force = temp_v;
+
+	simSetGraphUserData(force_graph_handler, "F_x", global_device_force.x());
+	simSetGraphUserData(force_graph_handler, "F_y", global_device_force.y());
+	simSetGraphUserData(force_graph_handler, "F_z", global_device_force.z());
+	simSetGraphUserData(force_graph_handler, "Magnitude", global_device_force.norm());
+}
+
+void filter_velocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init)
+{
+	if (init)
+	{
+		for (int i = 0; i < buffer_vel_size; i++)
+			v_vector[i] = new_vel;
+
+		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
+		mean_vel = new_vel;
+		simSetGraphUserData(vel_graph_handler, "Filtered_vel", mean_vel.norm());
+	}
+	else
+	{
+		for (int i = buffer_vel_size - 1; i > 0; i--)
+			v_vector[i] = v_vector[i - 1];
+
+		v_vector[0] = new_vel;
+
+		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
+
+		mean_vel.setZero();
+		for (int j = 0; j < buffer_vel_size; j++)
+			mean_vel += v_vector[j];
+		mean_vel = mean_vel / buffer_vel_size;
+
+		simSetGraphUserData(vel_graph_handler, "Filtered_vel", mean_vel.norm());
+	}
 }
 
 
