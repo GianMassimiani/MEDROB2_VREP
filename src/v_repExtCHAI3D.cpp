@@ -155,6 +155,8 @@ Matrix4f offset_transform;
 Vector3f lin_offset;
 Matrix3f rot_offset;
 Matrix3f force_offset_rot;
+Vector3f inertia_F;
+Vector3f tool_vel, tool_omega;
 
 Matrix4f dummy_T;
 
@@ -2014,7 +2016,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// Create a cursor (cone) to be associated to the dummy. 
 		// A virtual coupling is implemented between the dummy and the tool.
-		tool_handler = simCreatePureShape(3, 31, tool_size, 0.01, NULL);
+		tool_handler = simCreatePureShape(3, 31, tool_size, 2.01, NULL);
 		simSetObjectParent(tool_handler, -1, true);
 
 		// Create a "point puzzo" only to apply a rotation to the tip of the
@@ -2083,6 +2085,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		case 1:
 			if (first_press)
 			{
+				simSetObjectParent(tool_handler, -1, true);
+				simSetObjectParent(tool_tip_handler, tool_handler, true);
 				get_offset();
 				first_press = false;
 			}
@@ -2112,11 +2116,25 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// COUT
 		want_to_print = true;
+
+		float sim_tool_vel[3];
+		float sim_tool_omega[3];
+
+		simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
+		sim2EigenVec3f(sim_tool_vel, tool_vel);
+		sim2EigenVec3f(sim_tool_omega, tool_omega);
+
+
 		if (global_cnt % 100 == 0 && want_to_print)
 		{
 			cout << endl << "Epoch: \t" << global_cnt << endl;
 			cout << "Button idx: \t" << button << endl;
 
+			cout << "Tool linear velocity\n" << tool_vel << endl;
+			cout << "Device linear velocity\n" << device_state.vel << endl;
+			cout << "T_V - D_V\n" << tool_vel - device_state.vel << endl;
+
+			cout << "Inertia F\n" << inertia_F << endl;
 			//cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
 		}
 		global_cnt++;
@@ -2232,32 +2250,27 @@ void compute_global_force(void)
 {
 	Vector3f tool_tip_F;
 	Vector3d temp_v;
-	Matrix4f tool_T, dummy_T;
-	Matrix3f tool_R, dummy_R;
-	Matrix3f rot_Y;
-	rot_Y << 0, 0, -1,
-		0, 1, 0,
-		0, 0, 1;
+	Matrix4f dummy_T;
+	Matrix3f dummy_R;
 
-	float sim_tool_T[12];
 	float sim_dummy_T[12];
 
-	simGetObjectMatrix(tool_handler, -1, sim_tool_T);
 	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
-	sim2EigenTransf(sim_tool_T, tool_T);
 	sim2EigenTransf(sim_dummy_T, dummy_T);
-	tool_R = tool_T.block<3, 3>(0, 0);
 	dummy_R = dummy_T.block<3, 3>(0, 0);
 
-	//tool_tip_F = tool_R.transpose() * Vector3f::UnitZ();
-	tool_tip_F = tool_R.col(2); // forza lungo l'asse z del tool (sempre)
-	//tool_tip_F = dummy_R.col(0); // forza lungo l'asse x del dummy (sempre)
+	tool_tip_F = dummy_R.col(0); // forza lungo l'asse x del dummy (sempre)
 
+	//temp_v = tool_tip_F.cast<double>();
 
-	//tool_tip_F = rot_offset * tool_tip_F;
-	temp_v(0) = (double)tool_tip_F(0);
-	temp_v(1) = (double)tool_tip_F(1);
-	temp_v(2) = (double)tool_tip_F(2);
+	Matrix3f K_inertia;
+	K_inertia.setIdentity();
+	K_inertia << 1, 0, 0,
+		0, 1, 0,
+		0, 0, 2.5;
+	inertia_F = K_inertia * (device_state.vel - tool_vel);
+
+	temp_v = inertia_F.cast<double>();
 
 	global_device_force = temp_v;
 }
