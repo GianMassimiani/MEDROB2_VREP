@@ -132,7 +132,6 @@ double LowestStiffness = -1.0;
 // ------------------------------------------------------------------------- //
 // ------------------------------------------------------------------------- //
 
-
 DeviceState device_state;
 #define DEVICE_IDX 0
 #define TOOL_RADIUS 0.005
@@ -159,6 +158,9 @@ int global_cnt = 0;
 
 Vector3d global_device_force(0.0, 0.0, 0.0);
 Vector3f tool_external_F(0.0, 0.0, 0.0);
+// pentration_parameters_v -> tissue_h, K_tissue, B_tissue.
+Vector3fVector tissue_params;
+
 Matrix4f offset_transform;
 Vector3f lin_offset;
 Matrix3f rot_offset;
@@ -2089,6 +2091,24 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
 		simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
 
+		//Setup tissue params
+		tissue_params[0] <<
+			1.0,
+			331,
+			3;
+		tissue_params[1] <<
+			1.0,
+			83,
+			1;
+		tissue_params[2] <<
+			1.0,
+			497,
+			3;
+		tissue_params[3] <<
+			1.0,
+			2483,
+			0;
+
 	}
 
 
@@ -2476,7 +2496,51 @@ void checkValues(int init_val, int fin_val, float* param, float default_value)
 }
 
 // Forces on the dummy (PENETRATION)
-void computeExternalForce(void)
+void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector3f& _contact_pos)
 {
+	float DOP_local;
+	float DOP = abs(_contact_pos.z() - _tool_tip_pos.z());
+	float total_penetration = (_tool_tip_pos - _contact_pos).norm(); // total penetration
+	float local_penetration; // in each tissue
+
+	if (DOP >= tissue_params[0](0) && DOP < tissue_params[1](0))
+	{
+		local_penetration = total_penetration;
+	}
+	else if (DOP >= tissue_params[1](0) && DOP < tissue_params[2](0))
+	{
+		DOP_local = DOP - tissue_params[0](0);
+		local_penetration = (DOP_local / DOP) * total_penetration;
+	}
+	else if (DOP >= tissue_params[2](0) && DOP < tissue_params[3](0))
+	{
+		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0));
+		local_penetration = (DOP_local / DOP) * total_penetration;
+	}
+	else if (DOP >= tissue_params[3](0))
+	{
+		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0) + tissue_params[2](0));
+		local_penetration = (DOP_local / DOP) * total_penetration;
+	}
+
+
+	if (DOP >= tissue_params[0](0) && DOP < tissue_params[1](0))
+		local_penetration = total_penetration;
+	else if (DOP >= tissue_params[1](0) && DOP < tissue_params[2](0))
+	{
+		DOP_local = DOP - tissue_params[0](0);
+		local_penetration = (DOP_local / DOP) * total_penetration;
+	}
+	else if (DOP >= tissue_params[2](0) && DOP < tissue_params[3](0))
+	{
+		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0));
+		local_penetration = (DOP_local / DOP) * total_penetration;
+	}
+	else if (DOP >= tissue_params[3](0))
+	{
+		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0) + tissue_params[2](0));
+		local_penetration = (DOP_local / DOP) * total_penetration;
+	}
+
 	return;
 }
