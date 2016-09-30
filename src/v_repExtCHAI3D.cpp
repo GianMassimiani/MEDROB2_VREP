@@ -139,15 +139,18 @@ DeviceState device_state;
 #define WS_RADIUS 0.2
 
 simFloat tool_size[3] = {
-	1.001 / 3,
-	1.001 / 3,
-	(1.5 + TOOL_RADIUS) / 3 };
+	(float)1.001 / 3,
+	(float)1.001 / 3,
+	(float)(1.5 + TOOL_RADIUS) / 3 };
 simInt dummy_handler;
 simInt tool_handler;
 simInt tool_tip_handler;
 simFloat resolution = 5.0;
 simInt vel_graph_handler;
 simInt force_graph_handler;
+simInt UI_handler;
+simInt aux_val[2] = { NULL, NULL };
+simInt button_handler;
 
 bool want_to_print = false;
 int button;
@@ -155,14 +158,18 @@ bool first_press = true;
 int global_cnt = 0;
 
 Vector3d global_device_force(0.0, 0.0, 0.0);
+Vector3f tool_external_F(0.0, 0.0, 0.0);
 Matrix4f offset_transform;
 Vector3f lin_offset;
 Matrix3f rot_offset;
 Matrix3f force_offset_rot;
-Vector3f inertia_F;
+Vector3f F_mc;
 Vector3f tool_vel, tool_omega;
 
 Matrix4f dummy_T;
+// UI parameters
+int controller_ID = 1;
+Matrix3f K_m, B_m;
 
 //! Velocity Filtering
 const int buffer_vel_size = 33;
@@ -175,13 +182,16 @@ std::vector<Eigen::Vector3f> tool_vel_vector(buffer_vel_size);
 //! ------------------ FUNCTIONS DECLARATIONS ----------------------//
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
-void update_rot(void);
-void update_pos_penetration(void); // o.O
-void update_pose(void);
-void get_offset(void);
-void compute_global_force(void);
-void filter_velocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init);
-
+void updateRot(void);
+void updatePosPenetration(void); // o.O
+void updatePose(void);
+void getOffset(void);
+void computeGlobalForce(void);
+void computeExternalForce(void);
+void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init);
+void readUI(void);
+void checkAndSetValues(int ID);
+void checkValues(int init_val, int fin_val, float* param, float default_value);
 
 
 
@@ -1221,11 +1231,11 @@ int chai3DAddShape(simFloat** vertices, simFloat** indices, simFloat* position, 
 	if (stiffness < 0.0)
 		stiffness = 0.0;
 
-	vector<float> v_vector(vertices[0][0]);
-	vector<int>	idx_vector(indices[0][0]);
+	vector<float> v_vector;
+	vector<int>	idx_vector;
 
-	objectID = addObject(new Object(position, rotation, v_vector, idx_vector, stiffness));
-	return objectID;
+	//objectID = addObject(new Object(position, rotation, v_vector, idx_vector, stiffness));
+	return -1; //objectID placeholder
 }
 
 void LUA_ADD_SHAPE_CALLBACK(SLuaCallBack* p)
@@ -1853,6 +1863,8 @@ unsigned int chai3DGetButton(simInt device_idx)
 	{
 		return Cursors[device_idx]->Tool->getUserSwitches();
 	}
+	else
+		return 0;
 }
 
 void LUA_READ_BUTTONS_CALLBACK(SLuaCallBack* p)
@@ -1999,6 +2011,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	simSetIntegerParameter(sim_intparam_error_report_mode, sim_api_errormessage_ignore);
 	simSetIntegerParameter(sim_intparam_error_report_mode, errorModeSaved);
 
+	readUI();
+
 
 	// ------------------------------------------------------------------------- //
 	// ------------------------------------------------------------------------- //
@@ -2022,19 +2036,19 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// Create a dummy point to be graphically associated with the position of 
 		// the haptic device in the virtual scene.
-		dummy_handler = simCreateDummy(0.1, NULL);
+		dummy_handler = simCreateDummy((float)0.1, NULL);
 		simSetObjectParent(dummy_handler, -1, true);
 
 		// Create a cursor (cone) to be associated to the dummy. 
 		// A virtual coupling is implemented between the dummy and the tool.
-		tool_handler = simCreatePureShape(3, 31, tool_size, 2.01, NULL);
+		tool_handler = simCreatePureShape(3, 31, tool_size, (float)0.001, NULL);
 		// TODO: include inertia values -> FULL VREP_LIB REQUIRED
 		//simComputeMassAndInertia(tool_handler, 7860); 
 		simSetObjectParent(tool_handler, -1, true);
 
 		// Create a "point puzzo" only to apply a rotation to the tip of the
 		// tool.
-		tool_tip_handler = simCreateDummy(0.01, NULL);
+		tool_tip_handler = simCreateDummy((float)0.01, NULL);
 		simSetObjectIntParameter(tool_tip_handler, 10, 0); // not visible
 		simSetObjectParent(tool_tip_handler, tool_handler, true);
 
@@ -2045,7 +2059,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Read the state of the haptic device (position, rotation, velocity)
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
-		filter_velocity(device_vel_vector, device_state.vel, device_state.vel, true);
+		filterVelocity(device_vel_vector, device_state.vel, device_state.vel, true);
 		cout << endl << "Filtered Vel:\n" << device_state.vel << endl;
 
 		// Set Dummy pose
@@ -2069,7 +2083,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		Vector3f zero_tmp;
 		zero_tmp.setZero();
-		filter_velocity(device_vel_vector, zero_tmp, zero_tmp, true);
+		filterVelocity(device_vel_vector, zero_tmp, zero_tmp, true);
 
 		// Set Tool-tip position
 		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
@@ -2091,7 +2105,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Read the state of the haptic device 
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
-		filter_velocity(device_vel_vector, device_state.vel, device_state.vel, false);
+		filterVelocity(device_vel_vector, device_state.vel, device_state.vel, false);
 
 		float sim_tool_vel[3];
 		float sim_tool_omega[3];
@@ -2115,32 +2129,32 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			{
 				simSetObjectParent(tool_handler, -1, true);
 				simSetObjectParent(tool_tip_handler, tool_handler, true);
-				get_offset();
+				getOffset();
 
 				// clear tool_vel buffer
 				Vector3f zero_tmp;
 				zero_tmp.setZero();
-				filter_velocity(device_vel_vector, zero_tmp, zero_tmp, true);
+				filterVelocity(device_vel_vector, zero_tmp, zero_tmp, true);
 
 				first_press = false;
 			}
 			simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
 			sim2EigenVec3f(sim_tool_vel, tool_vel);
 			sim2EigenVec3f(sim_tool_omega, tool_omega);
-			filter_velocity(tool_vel_vector, tool_vel, tool_vel, false);
+			filterVelocity(tool_vel_vector, tool_vel, tool_vel, false);
 
-			update_pose();
-			compute_global_force();
+			updatePose();
+			computeGlobalForce();
 			break;
 		case 2:
 			if (first_press)
 			{
 				simSetObjectParent(tool_tip_handler, -1, true);
 				simSetObjectParent(tool_handler, tool_tip_handler, true);
-				get_offset();
+				getOffset();
 				first_press = false;
 			}
-			update_rot();
+			updateRot();
 			break;
 		case 3:
 			first_press = true;
@@ -2165,7 +2179,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			cout << "Tool linear velocity\n" << tool_vel << endl;
 			cout << "T_V - D_V\n" << tool_vel - device_state.vel << endl;
 
-			cout << "Inertia F\n" << inertia_F << endl;
+			cout << "Inertia F\n" << F_mc << endl;
 			//cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
 		}
 		global_cnt++;
@@ -2198,7 +2212,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 // ------------------------- FUNCTIONS DEFINITIONS --------------------------//
 // ------------------------------------------------------------------------- //
 // ------------------------------------------------------------------------- //
-void update_rot(void)
+void updateRot(void)
 {
 
 	Matrix4f tool_tip_T, temp;
@@ -2217,12 +2231,12 @@ void update_rot(void)
 	simGetEulerAnglesFromMatrix(sim_tool_tip_T, sim_tool_tip_angles);
 	simSetObjectOrientation(tool_tip_handler, -1, sim_tool_tip_angles);
 }
-void update_pos_penetration(void)
+void updatePosPenetration(void)
 {
 	return; //placeholder
 }
 
-void update_pose(void)
+void updatePose(void)
 {
 	Vector3f tool_pos;
 	Matrix3f tool_rot;
@@ -2244,7 +2258,7 @@ void update_pose(void)
 	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
 }
 
-void get_offset(void)
+void getOffset(void)
 {
 	Matrix4f dummy_T;
 	Matrix4f tool_T;
@@ -2277,7 +2291,7 @@ void get_offset(void)
 }
 
 
-void compute_global_force(void)
+void computeGlobalForce(void)
 {
 	Vector3f tool_tip_F;
 	Vector3d temp_v;
@@ -2299,20 +2313,42 @@ void compute_global_force(void)
 	K_inertia << 1.0, 0, 0,
 		0, 1.0, 0,
 		0, 0, 1.0;
-	inertia_F = K_inertia * (device_state.vel - tool_vel);
+	F_mc = K_inertia * (device_state.vel - tool_vel);
+	
+	switch (controller_ID)
+	{
+	case 1:
+		// Pos/Force-Pos (Non-uniform matrix port)
+		F_mc = (K_m * tool_external_F) + (B_m * (device_state.vel - tool_vel));
+		break;
+	case 2:
+		// Pos / Pos
+		/*F_mc = -K_m * (device_state.pos)*/
 
+		//! F_mc = -K_m(x_m - x_md) - B_m(x_m_DOT - x_md_DOT) con x_md = x_s - x_offset
+		//! x_md -> proiezione di x_s nel 'device space'.
+		break;
+	case 3:
+		// Pos / Force
+		F_mc = K_m * tool_external_F;
+		break;
+	default:
+		// Null force (just in case)
+		F_mc.setZero();
+		break;
+	}
 
-	temp_v = inertia_F.cast<double>();
+	temp_v = F_mc.cast<double>();
 
 	global_device_force = temp_v;
 
-	simSetGraphUserData(force_graph_handler, "F_x", global_device_force.x());
-	simSetGraphUserData(force_graph_handler, "F_y", global_device_force.y());
-	simSetGraphUserData(force_graph_handler, "F_z", global_device_force.z());
-	simSetGraphUserData(force_graph_handler, "Magnitude", global_device_force.norm());
+	simSetGraphUserData(force_graph_handler, "F_x", (float)global_device_force.x());
+	simSetGraphUserData(force_graph_handler, "F_y", (float)global_device_force.y());
+	simSetGraphUserData(force_graph_handler, "F_z", (float)global_device_force.z());
+	simSetGraphUserData(force_graph_handler, "Magnitude", (float)global_device_force.norm());
 }
 
-void filter_velocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init)
+void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init)
 {
 	if (init)
 	{
@@ -2335,13 +2371,112 @@ void filter_velocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean
 		mean_vel.setZero();
 		for (int j = 0; j < buffer_vel_size; j++)
 			mean_vel += v_vector[j];
-		mean_vel = mean_vel / buffer_vel_size;
+		mean_vel = mean_vel / (const float)buffer_vel_size;
 
 		simSetGraphUserData(vel_graph_handler, "Filtered_vel", mean_vel.norm());
 	}
 }
 
+void readUI(void)
+{
 
+	UI_handler = simGetUIHandle("UI");
 
-//Matrix3f& multiplyMatricesEigen(const Eigen)
-/** @}*/
+	button_handler = simGetUIEventButton(UI_handler, aux_val);
+
+	switch (button_handler)
+	{
+	case 3:
+		controller_ID = 1;
+		simSetUIButtonLabel(UI_handler, 27, simGetUIButtonLabel(UI_handler, button_handler), NULL);
+		break;
+	case 12:
+		controller_ID = 2;
+		simSetUIButtonLabel(UI_handler, 27, simGetUIButtonLabel(UI_handler, button_handler), NULL);
+		break;
+	case 21:
+		controller_ID = 3;
+		simSetUIButtonLabel(UI_handler, 27, simGetUIButtonLabel(UI_handler, button_handler), NULL);
+		break;
+	case 39:
+		cout << "Check Values" << endl;
+		checkAndSetValues(controller_ID);
+		break;
+	default:
+		break;
+	}
+}
+
+void checkAndSetValues(int ID)
+{
+	float tmp[3];
+	K_m.setIdentity();
+	B_m.setIdentity();
+
+	if (ID == 1)
+	{
+		checkValues(6, 8, tmp, 1.0);
+		K_m(0, 0) = tmp[0];
+		K_m(1, 1) = tmp[1];
+		K_m(2, 2) = tmp[2];
+
+		checkValues(9, 11, tmp, 1.0);
+		B_m(0, 0) = tmp[0];
+		B_m(1, 1) = tmp[1];
+		B_m(2, 2) = tmp[2];
+	}
+	else if (ID == 2)
+	{
+		checkValues(15, 17, tmp, 1.0);
+		K_m(0, 0) = tmp[0];
+		K_m(1, 1) = tmp[1];
+		K_m(2, 2) = tmp[2];
+
+		checkValues(18, 20, tmp, 1.0);
+		B_m(0, 0) = tmp[0];
+		B_m(1, 1) = tmp[1];
+		B_m(2, 2) = tmp[2];
+	}
+	else if (ID == 3)
+	{
+		checkValues(24, 26, tmp, 1.0);
+		K_m(0, 0) = tmp[0];
+		K_m(1, 1) = tmp[1];
+		K_m(2, 2) = tmp[2];
+	}
+}
+
+void checkValues(int init_val, int fin_val, float* param, float default_value) 
+{
+	simChar* label;
+
+	char buff[256];
+	for (int i = init_val; i <= fin_val; i++) 
+	{
+		label = simGetUIButtonLabel(UI_handler, i);
+
+		string data(label);
+		if(data == "") 
+		{
+			param[i - init_val] = default_value;
+			sprintf(buff, "%.4f", default_value);
+			simSetUIButtonLabel(UI_handler, i, buff, NULL);
+		}
+		else
+		{
+			string::size_type sz;
+			float parsed_data = stof(data, &sz);
+			sprintf(buff, "%.4f", parsed_data);
+			simSetUIButtonLabel(UI_handler, i, buff, NULL);
+			param[i - init_val] = parsed_data;
+		}
+
+	}
+
+}
+
+// Forces on the dummy (PENETRATION)
+void computeExternalForce(void)
+{
+	return;
+}
