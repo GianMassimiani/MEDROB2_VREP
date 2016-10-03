@@ -1,44 +1,7 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
-  Tissue.cpp
   v_repExtCHAI3D.cpp
-src\v_repExtCHAI3D.cpp(162): error C4430: identificatore di tipo mancante, verrà utilizzato int. Nota: default-int non è più supportato in C++
-src\v_repExtCHAI3D.cpp(162): error C2146: errore di sintassi: ';' mancante prima dell'identificatore 'tissue_params'
-src\v_repExtCHAI3D.cpp(178): error C2378: 'Vector3fVector': ridefinizione. Impossibile eseguire l'overload del simbolo con typedef.
-  src\v_repExtCHAI3D.cpp(162): note: vedere la dichiarazione di 'Vector3fVector'
-src\v_repExtCHAI3D.cpp(193): error C2065: 'v_vector': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(193): error C2065: 'new_vel': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(193): error C2275: 'Eigen::Vector3f': tipo non valido come espressione
-  c:\users\istin\documents\chai3d\external\eigen\eigen\src/Core/Matrix.h(409): note: vedere la dichiarazione di 'Eigen::Vector3f'
-src\v_repExtCHAI3D.cpp(193): error C2065: 'mean_vel': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(193): error C2062: tipo 'bool' imprevisto
-src\v_repExtCHAI3D.cpp(2064): error C3861: 'filterVelocity': identificatore non trovato
-src\v_repExtCHAI3D.cpp(2088): error C3861: 'filterVelocity': identificatore non trovato
-src\v_repExtCHAI3D.cpp(2095): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2099): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2103): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2107): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2128): error C3861: 'filterVelocity': identificatore non trovato
-src\v_repExtCHAI3D.cpp(2157): error C3861: 'filterVelocity': identificatore non trovato
-src\v_repExtCHAI3D.cpp(2164): error C3861: 'filterVelocity': identificatore non trovato
-src\v_repExtCHAI3D.cpp(2371): error C2065: 'v_vector': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2371): error C2065: 'new_vel': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2371): error C2275: 'Eigen::Vector3f': tipo non valido come espressione
-  c:\users\istin\documents\chai3d\external\eigen\eigen\src/Core/Matrix.h(409): note: vedere la dichiarazione di 'Eigen::Vector3f'
-src\v_repExtCHAI3D.cpp(2371): error C2065: 'mean_vel': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2371): error C2062: tipo 'bool' imprevisto
-src\v_repExtCHAI3D.cpp(2372): error C2143: errore di sintassi: ';' mancante prima di '{'
-src\v_repExtCHAI3D.cpp(2372): error C2447: '{': intestazione di funzione mancante. Elenco formale di tipo obsoleto?
-src\v_repExtCHAI3D.cpp(2506): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2510): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2512): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2515): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2517): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2520): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2522): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2527): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2529): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2531): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2534): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2536): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2539): error C2065: 'tissue_params': identificatore non dichiarato
-src\v_repExtCHAI3D.cpp(2541): error C2065: 'tissue_params': identificatore non dichiarato
+     Creazione della libreria ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
+  Generazione codice in corso...
+  Generazione codice terminata
+  CHAI3D-V-REP-VS2015.vcxproj -> C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll
+  CHAI3D-V-REP-VS2015.vcxproj -> ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.pdb (Full PDB)

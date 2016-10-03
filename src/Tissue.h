@@ -7,11 +7,11 @@
 
 struct Layer
 {
-	std::string name;
-	float	thick;
-	float	K;
-	float	B;
-	bool	is_perforated;
+	std::string _name;
+	float	_thick;
+	float	_K;
+	float	_B;
+	bool	_is_perforated;
 };
 
 class Tissue
@@ -24,6 +24,10 @@ public:
 		std::vector<float>& K_vec, 
 		std::vector<float>& B_vec);
 	~Tissue();
+
+	void setLayer(std::string name, float t, float k, float b);
+	void getLayerParams(std::string name, float out_t, float out_k, float out_b);
+	bool checkPerforation(std::string name);
 
 private:
 	void initLayer(Layer& l, std::string name, float t, float k, float b);

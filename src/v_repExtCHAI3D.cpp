@@ -68,6 +68,7 @@ using namespace chai3d;
 #define PLUGIN_VERSION 1
 
 #include "../DeviceState.h" //! Improve
+//#include "Tissue.h"
 #include "utility.h"
 
 #include <Eigen/Core>
@@ -150,6 +151,7 @@ simInt force_graph_handler;
 simInt UI_handler;
 simInt aux_val[2] = { NULL, NULL };
 simInt button_handler;
+simChar* current_controller = "Position/Position-Force Controller";
 
 bool want_to_print = false;
 int button;
@@ -159,7 +161,7 @@ int global_cnt = 0;
 Vector3d global_device_force(0.0, 0.0, 0.0);
 Vector3f tool_external_F(0.0, 0.0, 0.0);
 // pentration_parameters_v -> tissue_h, K_tissue, B_tissue.
-Vector3fVector tissue_params;
+std::vector<Eigen::Vector3f> tissue_params;
 
 Matrix4f offset_transform;
 Vector3f lin_offset;
@@ -174,26 +176,51 @@ int controller_ID = 1;
 Matrix3f K_m, B_m;
 
 //! Velocity Filtering
-const int buffer_vel_size = 33;
+const int buffer_vel_size = 3;
 typedef std::vector<Eigen::Vector3f> Vector3fVector;
 std::vector<Eigen::Vector3f> device_vel_vector (buffer_vel_size);
 std::vector<Eigen::Vector3f> tool_vel_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> device_mean_vel_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> tool_mean_vel_vector(buffer_vel_size);
+Vector3f device_LPF_vel(0.0, 0.0, 0.0);
+Vector3f tool_LPF_vel(0.0, 0.0, 0.0);
 
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
 //! ------------------ FUNCTIONS DECLARATIONS ----------------------//
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
+
+// Pose calculation
 void updateRot(void);
 void updatePosPenetration(void); // o.O
 void updatePose(void);
 void getOffset(void);
+
+// Force functions
 void computeGlobalForce(void);
-void computeExternalForce(void);
-void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init);
+void computeExternalForce(Vector3f& ext_F, 
+	Vector3f& _tool_tip_pos, 
+	const Vector3f& _contact_pos);
+
+// Filtering
+void filterVelocity(Vector3fVector& v_vector, 
+	Vector3f& new_vel, 
+	Vector3f& mean_vel, 
+	bool init);
+void LPFilter(Vector3fVector& v_vector, 
+	Vector3f& new_vel, 
+	Vector3fVector& mean_vel_vector, 
+	Vector3f& LPF_vel, 
+	bool init);
+
+// UI Functions
 void readUI(void);
 void checkAndSetValues(int ID);
-void checkValues(int init_val, int fin_val, float* param, float default_value);
+void checkValues(int init_val, 
+	int fin_val, 
+	float* param, 
+	float default_value);
 
 
 
@@ -1832,6 +1859,7 @@ void chai3DReadState(simInt device_idx, DeviceState& state)
 		state.T(0, 3) = state.pos(0);
 		state.T(1, 3) = state.pos(1);
 		state.T(2, 3) = state.pos(2);
+		
 	}
 }
 
@@ -2061,7 +2089,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Read the state of the haptic device (position, rotation, velocity)
 		chai3DReadState(DEVICE_IDX, device_state);
 		device_state.print();
-		filterVelocity(device_vel_vector, device_state.vel, device_state.vel, true);
+
 		cout << endl << "Filtered Vel:\n" << device_state.vel << endl;
 
 		// Set Dummy pose
@@ -2083,31 +2111,11 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		eigen2SimTransf(temp, scaled_tool_T);
 		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
 
-		Vector3f zero_tmp;
-		zero_tmp.setZero();
-		filterVelocity(device_vel_vector, zero_tmp, zero_tmp, true);
-
 		// Set Tool-tip position
 		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
 		simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
 
-		//Setup tissue params
-		tissue_params[0] <<
-			1.0,
-			331,
-			3;
-		tissue_params[1] <<
-			1.0,
-			83,
-			1;
-		tissue_params[2] <<
-			1.0,
-			497,
-			3;
-		tissue_params[3] <<
-			1.0,
-			2483,
-			0;
+		cout << "ABOUT FINITO" << endl;
 
 	}
 
@@ -2125,7 +2133,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Read the state of the haptic device 
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
-		filterVelocity(device_vel_vector, device_state.vel, device_state.vel, false);
+		//filterVelocity(device_vel_vector, device_state.vel, device_state.vel, false);
 
 		float sim_tool_vel[3];
 		float sim_tool_omega[3];
@@ -2154,14 +2162,22 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				// clear tool_vel buffer
 				Vector3f zero_tmp;
 				zero_tmp.setZero();
-				filterVelocity(device_vel_vector, zero_tmp, zero_tmp, true);
+				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
+				//filterVelocity(device_vel_vector, zero_tmp, zero_tmp, true);
+
+				LPFilter(tool_vel_vector, zero_tmp, tool_mean_vel_vector, tool_LPF_vel, true);
+				//filterVelocity(tool_vel_vector, zero_tmp, zero_tmp, true);
 
 				first_press = false;
 			}
+			LPFilter(device_vel_vector, device_state.vel, device_mean_vel_vector, device_LPF_vel, false);
+
 			simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
 			sim2EigenVec3f(sim_tool_vel, tool_vel);
 			sim2EigenVec3f(sim_tool_omega, tool_omega);
-			filterVelocity(tool_vel_vector, tool_vel, tool_vel, false);
+
+			LPFilter(tool_vel_vector, tool_vel, tool_mean_vel_vector, tool_LPF_vel, false);
+			//filterVelocity(tool_vel_vector, tool_vel, tool_vel, false);
 
 			updatePose();
 			computeGlobalForce();
@@ -2195,11 +2211,15 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			cout << endl << "Epoch: \t" << global_cnt << endl;
 			cout << "Button idx: \t" << button << endl;
 
+			cout << "************ Device state *************\n";
 			device_state.print();
+			cout << "***************************************" << endl;
 			cout << "Tool linear velocity\n" << tool_vel << endl;
-			cout << "T_V - D_V\n" << tool_vel - device_state.vel << endl;
 
-			cout << "Inertia F\n" << F_mc << endl;
+			cout << "Filtered device vel\n" << device_LPF_vel << endl;
+			cout << "Filtered tool vel\n" << tool_LPF_vel << endl;
+
+			cout << "F_mc\n" << F_mc << endl;
 			//cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
 		}
 		global_cnt++;
@@ -2328,18 +2348,19 @@ void computeGlobalForce(void)
 
 	//temp_v = tool_tip_F.cast<double>();
 
-	Matrix3f K_inertia;
-	K_inertia.setIdentity();
-	K_inertia << 1.0, 0, 0,
-		0, 1.0, 0,
-		0, 0, 1.0;
-	F_mc = K_inertia * (device_state.vel - tool_vel);
+	//Matrix3f K_inertia;
+	//K_inertia.setIdentity();
+	//K_inertia << 1.0, 0, 0,
+	//	0, 1.0, 0,
+	//	0, 0, 1.0;
+	//F_mc = K_inertia * (device_state.vel - tool_vel);
 	
 	switch (controller_ID)
 	{
 	case 1:
 		// Pos/Force-Pos (Non-uniform matrix port)
-		F_mc = (K_m * tool_external_F) + (B_m * (device_state.vel - tool_vel));
+		//F_mc = (K_m * tool_external_F) + (B_m * (device_state.vel - tool_vel));
+		F_mc = (K_m * tool_external_F) + (B_m * (device_LPF_vel - tool_LPF_vel));
 		break;
 	case 2:
 		// Pos / Pos
@@ -2368,6 +2389,7 @@ void computeGlobalForce(void)
 	simSetGraphUserData(force_graph_handler, "Magnitude", (float)global_device_force.norm());
 }
 
+
 void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_vel, bool init)
 {
 	if (init)
@@ -2393,9 +2415,68 @@ void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_
 			mean_vel += v_vector[j];
 		mean_vel = mean_vel / (const float)buffer_vel_size;
 
+
 		simSetGraphUserData(vel_graph_handler, "Filtered_vel", mean_vel.norm());
 	}
 }
+
+
+void LPFilter(Vector3fVector& v_vector, Vector3f& new_vel, Vector3fVector& mean_vel_vector, Vector3f& LPF_vel, bool init)
+{
+	if (init)
+	{
+		if (v_vector.size() != mean_vel_vector.size())
+		{
+			cerr << "Error, different vectors size" << endl;
+			return;
+		}
+
+		for (int i = 0; i < buffer_vel_size; i++)
+			v_vector[i] = new_vel;
+
+		for (int i = 0; i < buffer_vel_size; i++)
+			mean_vel_vector[i] = new_vel;
+
+		LPF_vel.setZero();
+
+		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
+		simSetGraphUserData(vel_graph_handler, "Filtered_vel", LPF_vel.norm());
+	}
+	else
+	{
+		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
+
+		//! Il filtraggio potrebbe dover essere fatto nell'haptic loop 
+		//! poiché originariamente richiede una frequenza di aggiornamento di 1000Hz;
+		float update_freq = 1000.0f;
+		//! Questo parametro dipende dalla frequenza (come sopra)
+		//! Modificarlo?!
+		float alpha = (0.001f / (0.001f + 0.07f));
+
+
+		Vector3f mean_vel;
+		mean_vel = (0.2196f *(new_vel + v_vector[2]) +
+			0.6588f * (v_vector[0] + v_vector[1])) / update_freq -
+			(-2.7488f * mean_vel_vector[0] + 2.5282f * mean_vel_vector[1] - 0.7776f * mean_vel_vector[2]);
+
+		// Input Vector Shift
+		for (int i = buffer_vel_size - 1; i > 0; i--)
+			v_vector[i] = v_vector[i - 1];
+		v_vector[0] = new_vel;
+		// Output Vector Shift
+		for (int i = buffer_vel_size - 1; i > 0; i--)
+			mean_vel_vector[i] = mean_vel_vector[i - 1];
+		mean_vel_vector[0] = mean_vel;
+
+		// LPF
+		LPF_vel = LPF_vel + (mean_vel_vector[0] - LPF_vel)*alpha;
+		
+		simSetGraphUserData(vel_graph_handler, "Filtered_vel", LPF_vel.norm());
+	}
+}
+
+
+
 
 void readUI(void)
 {
@@ -2408,19 +2489,26 @@ void readUI(void)
 	{
 	case 3:
 		controller_ID = 1;
-		simSetUIButtonLabel(UI_handler, 27, simGetUIButtonLabel(UI_handler, button_handler), NULL);
+		current_controller = simGetUIButtonLabel(UI_handler, button_handler);
+		simSetUIButtonLabel(UI_handler, 27, current_controller, NULL);
 		break;
 	case 12:
 		controller_ID = 2;
-		simSetUIButtonLabel(UI_handler, 27, simGetUIButtonLabel(UI_handler, button_handler), NULL);
+		current_controller = simGetUIButtonLabel(UI_handler, button_handler);
+		simSetUIButtonLabel(UI_handler, 27, current_controller, NULL);
 		break;
 	case 21:
 		controller_ID = 3;
-		simSetUIButtonLabel(UI_handler, 27, simGetUIButtonLabel(UI_handler, button_handler), NULL);
+		current_controller = simGetUIButtonLabel(UI_handler, button_handler);
+		simSetUIButtonLabel(UI_handler, 27, current_controller, NULL);
 		break;
 	case 39:
+		if (simGetSimulationState() == sim_simulation_advancing_running)
+			simStopSimulation();
+
 		cout << "Check Values" << endl;
 		checkAndSetValues(controller_ID);
+		simStartSimulation();
 		break;
 	default:
 		break;
@@ -2464,6 +2552,7 @@ void checkAndSetValues(int ID)
 		K_m(1, 1) = tmp[1];
 		K_m(2, 2) = tmp[2];
 	}
+	simSetUIButtonLabel(UI_handler, 27, current_controller, NULL);
 }
 
 void checkValues(int init_val, int fin_val, float* param, float default_value) 
