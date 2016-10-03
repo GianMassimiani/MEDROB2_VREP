@@ -139,12 +139,13 @@ DeviceState device_state;
 #define WS_RADIUS 0.2
 
 simFloat tool_size[3] = {
-	(float)1.001 / 3,
-	(float)1.001 / 3,
-	(float)(1.5 + TOOL_RADIUS) / 3 };
+	(float)0.03,
+	(float)0.03,
+	(float)0.095};
 simInt dummy_handler;
 simInt tool_handler;
 simInt tool_tip_handler;
+simInt lwr_target_handler;
 simFloat resolution = 5.0;
 simInt vel_graph_handler;
 simInt force_graph_handler;
@@ -160,7 +161,6 @@ int global_cnt = 0;
 
 Vector3d global_device_force(0.0, 0.0, 0.0);
 Vector3f tool_external_F(0.0, 0.0, 0.0);
-// pentration_parameters_v -> tissue_h, K_tissue, B_tissue.
 std::vector<Eigen::Vector3f> tissue_params;
 
 Matrix4f offset_transform;
@@ -2112,10 +2112,17 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
 
 		// Set Tool-tip position
+		float sim_tool_tip_T[12];
 		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
 		simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
+		simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
 
-		cout << "ABOUT FINITO" << endl;
+		// LWR target init
+		lwr_target_handler = simGetObjectHandle("Target");
+		simSetObjectMatrix(lwr_target_handler, -1, sim_tool_tip_T);
+		//simSetObjectMatrix(lwr_target_handler, -1, scaled_tool_T); // displacement??
+		simSetObjectParent(lwr_target_handler, tool_tip_handler, true);
+		simSetObjectIntParameter(lwr_target_handler, 10, 0); // not visible
 
 	}
 
@@ -2218,6 +2225,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			cout << "Filtered device vel\n" << device_LPF_vel << endl;
 			cout << "Filtered tool vel\n" << tool_LPF_vel << endl;
+			cout << "VEL DIFF\n" << device_LPF_vel - tool_LPF_vel << endl;
 
 			cout << "F_mc\n" << F_mc << endl;
 			//cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
@@ -2354,6 +2362,7 @@ void computeGlobalForce(void)
 	//	0, 1.0, 0,
 	//	0, 0, 1.0;
 	//F_mc = K_inertia * (device_state.vel - tool_vel);
+	
 	
 	switch (controller_ID)
 	{
