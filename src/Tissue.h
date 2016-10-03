@@ -5,6 +5,10 @@
 #include <Eigen/LU>
 #include <math.h>
 
+#include "luaFunctionData.h"
+#include "v_repLib.h"
+#include "utility.h"
+
 struct Layer
 {
 	std::string _name;
@@ -19,18 +23,24 @@ class Tissue
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	Tissue();
-	Tissue(std::vector<std::string>& name_vec, 
-		std::vector<float>& thickness_vec, 
-		std::vector<float>& K_vec, 
-		std::vector<float>& B_vec);
 	~Tissue();
 
-	void setLayer(std::string name, float t, float k, float b);
-	void getLayerParams(std::string name, float out_t, float out_k, float out_b);
+	void addLayer(std::string name, float t, float k, float b);
+	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b);
 	bool checkPerforation(std::string name);
+	void tooglePerforation(std::string name);
+	void renderLayers(void);
+
+	inline void setTissueCenter(Eigen::Vector3f c) { _center_pos = c; };
+	inline void setScale(float h, float w) { _scale[0] = h; _scale[1] = w; };
+
+	void printTissue(void);
 
 private:
-	void initLayer(Layer& l, std::string name, float t, float k, float b);
+	Eigen::Vector3f _center_pos;
+	float _scale[2];
+	float _d;
+
 
 	std::vector<Layer> _layers;
 	int _N;

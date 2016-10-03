@@ -68,7 +68,7 @@ using namespace chai3d;
 #define PLUGIN_VERSION 1
 
 #include "../DeviceState.h" //! Improve
-//#include "Tissue.h"
+#include "Tissue.h"
 #include "utility.h"
 
 #include <Eigen/Core>
@@ -146,6 +146,7 @@ simInt dummy_handler;
 simInt tool_handler;
 simInt tool_tip_handler;
 simInt lwr_target_handler;
+simInt lwr_tip_handler;
 simFloat resolution = 5.0;
 simInt vel_graph_handler;
 simInt force_graph_handler;
@@ -2124,6 +2125,28 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		simSetObjectParent(lwr_target_handler, tool_tip_handler, true);
 		simSetObjectIntParameter(lwr_target_handler, 10, 0); // not visible
 
+		//LWR tip init
+		lwr_tip_handler = simGetObjectHandle("Tip");
+
+
+
+
+		// TISSUE TRIALS
+		Tissue tis;
+		tis.addLayer("pelle", 1.0f, 331.0f, 3.0f);
+		tis.addLayer("grasso", 1.0f, 83.0f, 1.0f);
+		tis.addLayer("muscolo", 1.0f, 497.0f, 3.0f);
+		tis.addLayer("osso", 1.0f, 2480.0f, 0.0f);
+
+		tis.setTissueCenter(Vector3f(2.0, 1.0, 1.0));
+		tis.setScale(0.5, 0.7);
+		
+		tis.printTissue();
+		cout << "print fine" << endl;
+
+		tis.renderLayers();
+
+
 	}
 
 
@@ -2166,14 +2189,11 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				simSetObjectParent(tool_tip_handler, tool_handler, true);
 				getOffset();
 
-				// clear tool_vel buffer
+				// clear velocity buffers
 				Vector3f zero_tmp;
 				zero_tmp.setZero();
 				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
-				//filterVelocity(device_vel_vector, zero_tmp, zero_tmp, true);
-
 				LPFilter(tool_vel_vector, zero_tmp, tool_mean_vel_vector, tool_LPF_vel, true);
-				//filterVelocity(tool_vel_vector, zero_tmp, zero_tmp, true);
 
 				first_press = false;
 			}
@@ -2184,7 +2204,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			sim2EigenVec3f(sim_tool_omega, tool_omega);
 
 			LPFilter(tool_vel_vector, tool_vel, tool_mean_vel_vector, tool_LPF_vel, false);
-			//filterVelocity(tool_vel_vector, tool_vel, tool_vel, false);
 
 			updatePose();
 			computeGlobalForce();

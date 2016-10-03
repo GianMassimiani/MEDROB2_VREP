@@ -4,66 +4,32 @@ using namespace std;
 
 Tissue::Tissue()
 {
-	_N = 1;
-	for (int i = 0; i < _N; i++)
-		initLayer(_layers[i], "L_" + to_string(i), 0, 0, 0);
-}
-
-Tissue::Tissue(std::vector<std::string>& name_vec, 
-	std::vector<float>& thickness_vec, 
-	std::vector<float>& K_vec, 
-	std::vector<float>& B_vec)
-{
-	_N = name_vec.size();
-	int t_size = thickness_vec.size();
-	int k_size = K_vec.size();
-	int b_size = B_vec.size();
-
-	if (_N != t_size || _N != b_size || _N != k_size)
-	{
-		cerr << "Error! Input vectors have different sizes" << endl;
-		return;
-	}
-
-	for (int i = 0; i < _N; i++)
-		initLayer(_layers[i], name_vec[i],thickness_vec[i], K_vec[i], B_vec[i]);
+	_N = 0;
+	_center_pos.setZero();
 }
 
 Tissue::~Tissue()
 {
+	// placeholder
 }
-void Tissue::initLayer(Layer& l, std::string name,float t, float k, float b)
+
+
+void Tissue::addLayer(std::string name, float t, float k, float b)
 {
-	l._thick = t;
-	l._name = name;
-	l._K = k;
-	l._B = b;
-	l._is_perforated = false;
+	Layer temp_l;
+	temp_l._thick = t;
+	temp_l._name = name;
+	temp_l._K = k;
+	temp_l._B = b;
+	temp_l._is_perforated = false;
+
+	_layers.push_back(temp_l);
+	_N++;
+
+	// ADD CUBES HERE
 }
 
-void Tissue::setLayer(std::string name, float t, float k, float b)
-{
-	//! WILL THIS WORK?
-	int idx = -1;
-	bool flag = false;
-	for (int i = 0; i < _N; i++)
-	{
-		if (name == _layers[i]._name)
-		{
-			flag = true;
-			idx = i;
-		}
-	}
-	if (!flag)
-	{
-		cerr << "Error, no such tissue layer!" << endl;
-		return;
-	}
-
-	initLayer(_layers[idx], name, t, k, b);
-}
-
-void Tissue::getLayerParams(std::string name, float out_t, float out_k, float out_b)
+void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float& out_b)
 {
 	//! WILL THIS WORK?
 	int idx = -1;
@@ -110,6 +76,61 @@ bool Tissue::checkPerforation(std::string name)
 		return true;
 	else
 		return false;
+}
+
+void Tissue::printTissue(void)
+{
+	for (int i = 0; i < _N; i++)
+	{
+		cout << "Layer " + _layers[i]._name << endl;
+		cout << "Thickness:\t" << _layers[i]._thick << endl;
+		cout << "K:\t" << _layers[i]._K << endl;
+		cout << "B:\t" << _layers[i]._B << endl;
+		cout << "Is perforated:\t" << _layers[i]._is_perforated << endl << endl;
+	}
+}
+
+void Tissue::tooglePerforation(std::string name)
+{
+	//! WILL THIS WORK?
+	int idx = -1;
+	bool flag = false;
+	for (int i = 0; i < _N; i++)
+	{
+		if (name == _layers[i]._name)
+		{
+			flag = true;
+			idx = i;
+		}
+	}
+	if (!flag)
+	{
+		cerr << "Error, no such tissue layer!" << endl;
+		return;
+	}
+	_layers[idx]._is_perforated = !_layers[idx]._is_perforated;
+}
+
+void Tissue::renderLayers(void)
+{
+	std::vector<int> cube_handlers;
+	float depth = _center_pos(2);
+	Vector3f curr_cube_pos;
+	float sim_curr_cube_pos[3];
+	for (int i = 0; i < _N; i++)
+	{
+		if (i == 0)
+			depth += (_layers[i]._thick / 2);
+		depth += (_layers[i - 1]._thick / 2) + (_layers[i]._thick / 2);
+		curr_cube_pos << _center_pos(0),
+			_center_pos(1), depth;
+		eigen2SimVec3f(curr_cube_pos, sim_curr_cube_pos);
+		float tmp[3] = { _scale[0], _scale[1], _layers[i]._thick };
+		cube_handlers.push_back(simCreatePureShape(0, 17, tmp, 1.0, NULL));
+		
+		simSetObjectPosition(cube_handlers[i], -1, sim_curr_cube_pos);
+	}
+	simGroupShapes(cube_handlers.data(), _N);
 }
 
 /*
