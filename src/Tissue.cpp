@@ -6,6 +6,9 @@ Tissue::Tissue()
 {
 	_N = 0;
 	_center_pos.setZero();
+
+	_dummy_rederer_handler = simCreateDummy(0.05f, NULL);
+	simSetObjectName(_dummy_rederer_handler, "Tissue_D");
 }
 
 Tissue::~Tissue()
@@ -113,24 +116,40 @@ void Tissue::tooglePerforation(std::string name)
 
 void Tissue::renderLayers(void)
 {
-	std::vector<int> cube_handlers;
+
 	float depth = _center_pos(2);
 	Vector3f curr_cube_pos;
+	Vector3f color_data;
 	float sim_curr_cube_pos[3];
+	float sim_total_cube_pos[3];
+
 	for (int i = 0; i < _N; i++)
 	{
 		if (i == 0)
-			depth += (_layers[i]._thick / 2);
-		depth += (_layers[i - 1]._thick / 2) + (_layers[i]._thick / 2);
-		curr_cube_pos << _center_pos(0),
-			_center_pos(1), depth;
+			depth -= (_layers[i]._thick / 2);
+		depth -= (_layers[i - 1]._thick / 2) + (_layers[i]._thick / 2);
+		curr_cube_pos << 0, 0, depth;
 		eigen2SimVec3f(curr_cube_pos, sim_curr_cube_pos);
 		float tmp[3] = { _scale[0], _scale[1], _layers[i]._thick };
-		cube_handlers.push_back(simCreatePureShape(0, 17, tmp, 1.0, NULL));
-		
-		simSetObjectPosition(cube_handlers[i], -1, sim_curr_cube_pos);
+		_cube_handlers.push_back(simCreatePureShape(0, 17, tmp, 1.0, NULL));
+		simSetObjectName(_cube_handlers[i], _layers[i]._name.c_str());
+		simSetShapeColor(_cube_handlers[i], NULL, sim_colorcomponent_ambient_diffuse, color_data.setRandom().data());
+		simSetObjectPosition(_cube_handlers[i], -1, sim_curr_cube_pos);
+
+		_layers[i]._handler = _cube_handlers[i];
 	}
-	simGroupShapes(cube_handlers.data(), _N);
+	float total_depth_total = 0;
+	for (int i = 0; i < _N; i++)
+		total_depth_total += _layers[i]._thick;
+
+
+	//float half_total_depth = (depth + _layers[_N - 1]._thick / 2) / 2;
+	eigen2SimVec3f(Vector3f(0.0f, 0.0f, (_center_pos(2) - total_depth_total/2 - _layers[0]._thick/2)), sim_total_cube_pos);
+	simSetObjectPosition(_dummy_rederer_handler, -1, sim_total_cube_pos);
+	for (int i = 0; i < _N; i++)
+		simSetObjectParent(_cube_handlers[i], _dummy_rederer_handler, true);
+	simSetObjectPosition(_dummy_rederer_handler, -1, _center_pos.data());
+
 }
 
 /*

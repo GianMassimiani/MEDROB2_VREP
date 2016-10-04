@@ -170,6 +170,7 @@ Matrix3f rot_offset;
 Matrix3f force_offset_rot;
 Vector3f F_mc;
 Vector3f tool_vel, tool_omega;
+Vector3f approaching_dir;
 
 Matrix4f dummy_T;
 // UI parameters
@@ -197,6 +198,8 @@ void updateRot(void);
 void updatePosPenetration(void); // o.O
 void updatePose(void);
 void getOffset(void);
+
+void getContactPoint(void);
 
 // Force functions
 void computeGlobalForce(void);
@@ -2108,7 +2111,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		orientation.col(2) = -device_state.rot.col(0);
 
 		temp.block<3, 3>(0, 0) = orientation;
-		temp.block<3, 1>(0, 3) = resolution * device_state.pos;
+		temp.block<3, 1>(0, 3) = Vector3f(0.25f, 0.15f, 0.7f);
 		eigen2SimTransf(temp, scaled_tool_T);
 		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
 
@@ -2131,19 +2134,16 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 
 
-		// TISSUE TRIALS
+		// TISSUE INIT
 		Tissue tis;
-		tis.addLayer("pelle", 1.0f, 331.0f, 3.0f);
-		tis.addLayer("grasso", 1.0f, 83.0f, 1.0f);
-		tis.addLayer("muscolo", 1.0f, 497.0f, 3.0f);
-		tis.addLayer("osso", 1.0f, 2480.0f, 0.0f);
-
-		tis.setTissueCenter(Vector3f(2.0, 1.0, 1.0));
-		tis.setScale(0.5, 0.7);
+		tis.addLayer("Skin",	0.02f,	331.0f,		3.0f);
+		tis.addLayer("Fat",		0.02f,	83.0f,		1.0f);
+		tis.addLayer("Muscle",	0.02f,	497.0f,		3.0f);
+		tis.addLayer("Bone",	0.02f,	2480.0f,	0.0f);
+		tis.setTissueCenter(Vector3f(0.0f, 0.5f, 0.45f));
+		tis.setScale(0.2f, 0.22f);
 		
 		tis.printTissue();
-		cout << "print fine" << endl;
-
 		tis.renderLayers();
 
 
@@ -2207,6 +2207,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			updatePose();
 			computeGlobalForce();
+			//getContactPoint();
 			break;
 		case 2:
 			if (first_press)
@@ -2219,12 +2220,25 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			updateRot();
 			break;
 		case 3:
-			first_press = true;
+			if (first_press)
+			{
+				simSetObjectParent(lwr_target_handler, -1, true);
+				float sim_lwr_tip_T[12];
+				Matrix4f lwr_tip_T;
+				simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
+				sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
+				approaching_dir = lwr_tip_T.block<3, 1>(0, 2);
+				getOffset();
+				first_press = false;
+			}
+			updatePose();
+			updatePosPenetration();
 			break;
 		default:
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
+			simSetObjectParent(lwr_target_handler, tool_tip_handler, true);
 
 			global_device_force.setZero();
 		}
@@ -2300,6 +2314,24 @@ void updateRot(void)
 }
 void updatePosPenetration(void)
 {
+	/*
+	cout << "sono dentro" << endl;
+	Vector3f tool_tip_pos, lwr_target_proj_pos;
+	Vector3f approaching_dir_unitV = approaching_dir;
+	approaching_dir_unitV.normalize();
+	float sim_tool_tip_pos[3];
+	float sim_lwr_target_proj_pos[3];
+
+	simGetObjectPosition(tool_tip_handler, -1, sim_tool_tip_pos);
+	sim2EigenVec3f(sim_tool_tip_pos, tool_tip_pos); 
+
+	cout << "tool_tip_pos\n" << tool_tip_pos << endl;
+	cout << "approaching_dir\n" << approaching_dir << endl;
+	lwr_target_proj_pos = (tool_tip_pos.dot(approaching_dir_unitV)) * approaching_dir_unitV;
+	cout << "lwr_target_proj_pos\n" << lwr_target_proj_pos << endl;
+	eigen2SimVec3f(lwr_target_proj_pos, sim_lwr_target_proj_pos);
+	simSetObjectPosition(lwr_target_handler, -1, sim_lwr_target_proj_pos);/**/
+
 	return; //placeholder
 }
 
@@ -2660,4 +2692,21 @@ void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector
 	}
 
 	return;
+}
+
+void getContactPoint(void)
+{
+	int touched_objects_handlers[2];
+	float contact_info[6];
+	simGetContactInfo(sim_handle_all, lwr_tip_handler, 2, touched_objects_handlers, contact_info);
+	cout << "touched_objects_handlers:\t" << 
+		simGetObjectName(touched_objects_handlers[0]) << "\t" <<
+		simGetObjectName(touched_objects_handlers[1]) << endl;
+	
+	Vector3f contact_pos, contact_force;
+	contact_pos << contact_info[0], contact_info[1], contact_info[2];
+	contact_force << contact_info[3], contact_info[4], contact_info[5];
+	cout << "contact_pos\n" << contact_pos << endl;
+	cout << "contact_force\n" << contact_force << endl;
+
 }

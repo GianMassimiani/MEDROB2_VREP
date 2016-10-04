@@ -16,6 +16,8 @@ struct Layer
 	float	_K;
 	float	_B;
 	bool	_is_perforated;
+
+	int		_handler;
 };
 
 class Tissue
@@ -41,7 +43,9 @@ private:
 	float _scale[2];
 	float _d;
 
+	int _dummy_rederer_handler;
 
+	std::vector<int> _cube_handlers;
 	std::vector<Layer> _layers;
 	int _N;
 
