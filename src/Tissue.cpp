@@ -6,9 +6,6 @@ Tissue::Tissue()
 {
 	_N = 0;
 	_center_pos.setZero();
-
-	_dummy_rederer_handler = simCreateDummy(0.05f, NULL);
-	simSetObjectName(_dummy_rederer_handler, "Tissue_D");
 }
 
 Tissue::~Tissue()
@@ -16,7 +13,12 @@ Tissue::~Tissue()
 	// placeholder
 }
 
-
+void Tissue::init(void)
+{
+	_dummy_rederer_handler = simCreateDummy(0.05f, NULL);
+	simSetObjectName(_dummy_rederer_handler, "Tissue_D");
+	return;
+}
 void Tissue::addLayer(std::string name, float t, float k, float b)
 {
 	Layer temp_l;
@@ -112,6 +114,26 @@ void Tissue::tooglePerforation(std::string name)
 		return;
 	}
 	_layers[idx]._is_perforated = !_layers[idx]._is_perforated;
+}
+
+int Tissue::getLayerHandler(std::string name)
+{
+	int idx = -1;
+	bool flag = false;
+	for (int i = 0; i < _N; i++)
+	{
+		if (name == _layers[i]._name)
+		{
+			flag = true;
+			idx = i;
+		}
+	}
+	if (!flag)
+	{
+		cerr << "Error, no such tissue layer!" << endl;
+		return 0;
+	}
+	return _layers[idx]._handler;
 }
 
 void Tissue::renderLayers(void)

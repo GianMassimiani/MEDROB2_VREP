@@ -138,6 +138,8 @@ DeviceState device_state;
 #define TOOL_RADIUS 0.005
 #define WS_RADIUS 0.2
 
+Tissue tis;
+
 simFloat tool_size[3] = {
 	(float)0.03,
 	(float)0.03,
@@ -2135,7 +2137,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 
 		// TISSUE INIT
-		Tissue tis;
+		tis.init();
 		tis.addLayer("Skin",	0.02f,	331.0f,		3.0f);
 		tis.addLayer("Fat",		0.02f,	83.0f,		1.0f);
 		tis.addLayer("Muscle",	0.02f,	497.0f,		3.0f);
@@ -2207,7 +2209,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			updatePose();
 			computeGlobalForce();
-			//getContactPoint();
+			getContactPoint();
 			break;
 		case 2:
 			if (first_press)
@@ -2244,7 +2246,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		}
 
 		// COUT
-		want_to_print = true;
+		want_to_print = false;
 
 		if (global_cnt % 100 == 0 && want_to_print)
 		{
@@ -2254,7 +2256,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			cout << "************ Device state *************\n";
 			device_state.print();
 			cout << "***************************************" << endl;
-			cout << "Tool linear velocity\n" << tool_vel << endl;
+			cout << "lwr_tip_handler\t" << lwr_tip_handler << endl;
+			cout << "Skin \t" << tis.getLayerHandler("Skin") << endl;
 
 			cout << "Filtered device vel\n" << device_LPF_vel << endl;
 			cout << "Filtered tool vel\n" << tool_LPF_vel << endl;
@@ -2698,15 +2701,9 @@ void getContactPoint(void)
 {
 	int touched_objects_handlers[2];
 	float contact_info[6];
-	simGetContactInfo(sim_handle_all, lwr_tip_handler, 2, touched_objects_handlers, contact_info);
-	cout << "touched_objects_handlers:\t" << 
-		simGetObjectName(touched_objects_handlers[0]) << "\t" <<
-		simGetObjectName(touched_objects_handlers[1]) << endl;
-	
+	simGetContactInfo(sim_handle_all, sim_handle_all, global_cnt, touched_objects_handlers, contact_info);	
 	Vector3f contact_pos, contact_force;
 	contact_pos << contact_info[0], contact_info[1], contact_info[2];
 	contact_force << contact_info[3], contact_info[4], contact_info[5];
-	cout << "contact_pos\n" << contact_pos << endl;
-	cout << "contact_force\n" << contact_force << endl;
 
 }

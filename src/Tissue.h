@@ -27,8 +27,10 @@ public:
 	Tissue();
 	~Tissue();
 
+	void init(void);
 	void addLayer(std::string name, float t, float k, float b);
 	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b);
+	int getLayerHandler(std::string name);
 	bool checkPerforation(std::string name);
 	void tooglePerforation(std::string name);
 	void renderLayers(void);
