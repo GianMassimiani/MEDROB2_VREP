@@ -121,3 +121,14 @@ void simMultiplyVec3fByScalar(float* v, float k)
 	v[1] = v[1] * k;
 	v[2] = v[2] * k;
 }
+
+VectorXf deg2radVec(VectorXf a)
+{
+	VectorXf b = a;
+	int size = a.size();
+	for (int i = 0; i < size; i++)
+	{
+		b(i) = deg2rad(a(i));
+	}
+	return b;
+}

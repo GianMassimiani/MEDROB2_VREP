@@ -1,10 +1,10 @@
 #include "robot_utilities.h"
 
-
+using namespace Eigen;
 
 Matrix4f linkCoordTransform(float a, float alpha, float d, float theta)
 {
-	Matrix4f result(4, 4);
+	Matrix4f result;
 
 	result(0, 0) = cos(theta);
 	result(0, 1) = -sin(theta)*cos(alpha);
@@ -25,7 +25,6 @@ Matrix4f linkCoordTransform(float a, float alpha, float d, float theta)
 	result(3, 1) = 0;
 	result(3, 2) = 0;
 	result(3, 3) = 1;
-
 	return result;
 }
 
@@ -70,6 +69,7 @@ Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, V
 //dei parametri cinematici e dei parametri della notazione di Denavit-Hartemberg
 Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord, int i_pos)
 {
+	// VEDERE PERCHE NON FUNZIONA
 	Matrix4f result;
 
 	//inizializzo la matrice con la matrice identità
@@ -77,19 +77,16 @@ Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, V
 
 	//questo vettore conterrà tutte le matrici di trasformazione di coordinate tra le terne associate a due link consecutivi.
 	//Il primo elemento (in posizione 0) si riferisce alla matrice A^0_1, il secondo alla matrice A^1_2, e così via fino a Ai-1,i
-	vector<Matrix4f> transform_matrices;
-
+	Matrix4f transform_matrices[7];
 	for (int i = 0; i<i_pos; i++)
 	{ //aggiunge elementi in coda al vettore
-		transform_matrices.push_back(linkCoordTransform(a_vec(i), alpha_vec(i), d_vec(i), joint_coord(i)));
+		transform_matrices[i] = (linkCoordTransform(a_vec(i), alpha_vec(i), d_vec(i), joint_coord(i)));
 	}
-
 	//effettuo il prodotto delle matrici di trasformazione per calcolare la cinematica diretta
 	for (int i = 0; i<i_pos; i++)
 	{
-		result = result * transform_matrices.at(i);
+		result = result * transform_matrices[i];
 	}
-
 	return result;
 }
 
@@ -110,7 +107,6 @@ MatrixXf jacobianoGeometrico(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec,
 
  */
 	Vector3f z0(0, 0, 1);
-
 	//calcolo delle matrici di trasformazione
 	Matrix4f A_0_1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, joint_coord, 1);
 	Matrix4f A_0_2 = cinematicaDiretta(a_vec, alpha_vec, d_vec, joint_coord, 2);
@@ -217,14 +213,13 @@ MatrixXf LWRGeometricJacobian(std::vector<float>& lwr_joint_q)
 	VectorXf d_vec;
 	VectorXf joint_coord(7);
 
-	//copio in una struttura VectorXf (7x1) i valori dei giunti della configurazione corrente
-	//escludendo i primi 6, che sono associati ad un free flying joint
 	for (int i = 0; i < 7; i++)
-		joint_coord(i - 6) = lwr_joint_q[i];
+		joint_coord(i) = lwr_joint_q[i];
 
 	setDHParameter(lwr_joint_q.size(), a_vec, alpha_vec, d_vec);
 
-	return jacobianoGeometrico(a_vec, alpha_vec, d_vec, joint_coord);
+	MatrixXf A = jacobianoGeometrico(a_vec, alpha_vec, d_vec, joint_coord);
+	return A;
 }
 
 
@@ -232,8 +227,11 @@ void computeNullSpaceVelocity(VectorXf& config_q_dot,
 	VectorXf& des_vel, VectorXf& des_pose, VectorXf& curr_pose,
 	MatrixXf& J, MatrixXf& Kp)
 {
-	MatrixXd temp = J * J.transpose();
-	MatrixXf pinv_J = J.transpose() * temp.inverse();
+
+	MatrixXf J_t = J.transpose();
+	MatrixXf temp = J * J_t;
+	auto inv_temp = temp.inverse();
+	MatrixXf pinv_J = J_t * inv_temp;
 
 	VectorXf auxiliary_vector(7);
 	for (int j = 0; j<7; j++)
@@ -241,13 +239,16 @@ void computeNullSpaceVelocity(VectorXf& config_q_dot,
 
 	VectorXf range_space_velocities(7), null_space_velocities(7);
 	MatrixXf I(7, 7);
+	I.setIdentity();
 	VectorXf r_dot(6);
-	r_dot = des_vel + Kp *(des_pose - curr_pose);
-
+	r_dot = des_vel;
+	//cout << "r_dot\n" << r_dot << endl;
 	range_space_velocities = pinv_J * r_dot;
-	null_space_velocities = (I.setIdentity() - pinv_J * J) * auxiliary_vector;
+	//cout << "range_space_velocities\n" << range_space_velocities << endl;
+	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
+	//cout << "null_space_velocities\n" << null_space_velocities << endl;
 
-	config_q_dot = range_space_velocities + null_space_velocities;
+	config_q_dot = range_space_velocities;
 }
 
 
@@ -256,8 +257,15 @@ void computeDLSVelocity(VectorXf& config_q_dot,
 	MatrixXf& J, MatrixXf Kp,float mu)
 {
 	MatrixXf I(6, 6);
+	I.setIdentity();
 	VectorXf r_dot(6);
 	r_dot = des_vel + Kp *(des_pose - curr_pose);
 
-	config_q_dot = J.transpose() * (J * J.transpose() + mu*mu*I).inverse() * r_dot;
+	MatrixXf J_t = J;
+	J_t.transpose();
+	MatrixXf A = (J * J_t + mu*mu*I);
+	config_q_dot = J_t * A.inverse() * r_dot;
 }
+
+
+

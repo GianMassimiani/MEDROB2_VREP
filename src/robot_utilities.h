@@ -4,11 +4,13 @@
 #include <algorithm>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <vector>
 
 #include "luaFunctionData.h"
 #include "v_repLib.h"
 #include "chai3d.h"
 #include "utility.h"
+using namespace Eigen;
 
 Matrix4f linkCoordTransform(float a, float alpha, float d, float theta);
 Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord);

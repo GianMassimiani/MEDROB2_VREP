@@ -154,7 +154,7 @@ simFloat resolution = 5.0;
 simInt vel_graph_handler;
 simInt force_graph_handler;
 simInt UI_handler;
-std::vector<simInt> joint_handlers;
+std::vector<simInt> lwr_joint_handlers;
 simInt aux_val[2] = { NULL, NULL };
 simInt button_handler;
 simChar* current_controller = "Position/Position-Force Controller";
@@ -176,6 +176,7 @@ Vector3f F_mc;
 Vector3f tool_vel, tool_omega;
 VectorXf lwr_q_dot(7);
 MatrixXf lwr_J(6,7);
+VectorXf lwr_desired_q(7);
 std::vector<float> lwr_curr_q_vector;
 
 Vector3f approaching_dir;
@@ -200,6 +201,7 @@ Vector3f tool_LPF_omega(0.0, 0.0, 0.0);
 std::vector<Eigen::Vector3f> tool_omega_vector(buffer_vel_size);
 std::vector<Eigen::Vector3f> tool_mean_omega_vector(buffer_vel_size);
 
+float time_step;
 
 
 
@@ -2159,9 +2161,20 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		tis.setTissueCenter(Vector3f(0.0f, 0.5f, 0.45f));
 		tis.setScale(0.2f, 0.22f);
 		
-		tis.printTissue();
-		tis.renderLayers();
+		//tis.printTissue();
+		//tis.renderLayers();
 
+		// JOINT HANDLERS
+		std::string temp_name;
+		for (int i = 1; i < 8; i++)
+		{
+			temp_name = "LBR4p_joint" + std::to_string(i);
+			cout << temp_name << endl;
+			lwr_joint_handlers.push_back(simGetObjectHandle(temp_name.c_str()));
+		}
+
+		cout << "Finish setup" << endl;
+		time_step = simGetSimulationTimeStep();
 
 	}
 
@@ -2375,34 +2388,71 @@ void updatePose(void)
 	eigen2SimTransf(tool_T, sim_tool_T);
 	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
 
+
+
 	//! ROBOT POSE
+	Vector3f tool_euler_angles, lwr_tip_curr_euler_angles, lwr_tip_curr_pos;
 	VectorXf total_tool_velocity(6), tool_pose(6), lwr_tip_curr_pose(6);
+	MatrixXf Kp(6, 6);
 	total_tool_velocity << tool_LPF_vel, tool_LPF_omega;
 
-	Vector3f tool_euler_angles(0.0, 0.0, 0.0), lwr_tip_curr_euler_angles(0.0, 0.0, 0.0), lwr_tip_curr_pos(0.0, 0.0, 0.0);
-	simGetObjectPosition(lwr_tip_handler, -1, lwr_tip_curr_pos.data());
-	simGetObjectOrientation(lwr_tip_handler, -1, lwr_tip_curr_euler_angles.data());
-	simGetObjectOrientation(tool_handler, -1, tool_euler_angles.data());
+	float sim_lwr_tip_curr_euler_angles[3];
+	float sim_lwr_tip_curr_pos[3];
+	float sim_tool_euler_angles[3];
 
-	MatrixXf Kp(6,6);
+	simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
+	simGetObjectOrientation(lwr_tip_handler, -1, sim_lwr_tip_curr_euler_angles);
+	simGetObjectOrientation(tool_handler, -1, sim_tool_euler_angles);
 
-	cout << "hdfysafgkuakbefcgakhgfycgaygsdbfcvmygasdcfas\n" << tool_euler_angles << endl;
+	sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
+	sim2EigenVec3f(sim_lwr_tip_curr_euler_angles, lwr_tip_curr_euler_angles);
+	sim2EigenVec3f(sim_tool_euler_angles, tool_euler_angles);
 	
-	tool_pose << tool_pos, tool_euler_angles;
-	lwr_tip_curr_pose << lwr_tip_curr_pos, lwr_tip_curr_euler_angles;
+	tool_pose << tool_pos, deg2radVec(tool_euler_angles);
+	lwr_tip_curr_pose << lwr_tip_curr_pos, deg2radVec(lwr_tip_curr_euler_angles);
 
-
+	float tmp;
+	lwr_curr_q_vector.clear();
 	for (int i = 0; i < 7; i++)
-		simGetJointPosition(joint_handlers[i], &lwr_curr_q_vector[i]);
+	{
+		simGetJointPosition(lwr_joint_handlers[i], &tmp);
+		lwr_curr_q_vector.push_back(deg2rad(tmp));
+	}
+
 	lwr_J = LWRGeometricJacobian(lwr_curr_q_vector);
-	computeNullSpaceVelocity(lwr_q_dot, total_tool_velocity, tool_pose, lwr_tip_curr_pose, lwr_J, Kp.setIdentity());
+	Kp.setIdentity();
+	computeNullSpaceVelocity(lwr_q_dot, total_tool_velocity, tool_pose, lwr_tip_curr_pose, lwr_J, Kp);
+
+	//cout << "lwr_curr_q_vector\n";
+	//for (int i = 0; i < lwr_curr_q_vector.size(); i++)
+	//{
+	//	cout << lwr_curr_q_vector[i] << endl;
+	//}
+	//cout << "total_tool_velocity\n" << total_tool_velocity << endl;
+	//cout << "tool_pose\n" << tool_pose << endl;
+	//cout << "lwr_tip_curr_pose\n" << lwr_tip_curr_pose << endl;
+	//cout << "lwr_J\n" << lwr_J << endl;
 
 	//cout << "lwr_tip_curr_pos PRE\n" << lwr_tip_curr_pos << endl;
-	for (int i = 0; i < 7; i++)
-		simSetJointTargetVelocity(joint_handlers[i], lwr_q_dot(i));
+	//for (int i = 0; i < 7; i++)
+	//	simSetJointTargetVelocity(lwr_joint_handlers[i], lwr_q_dot(i));
 
-	//simGetObjectPosition(lwr_tip_handler, -1, lwr_tip_curr_pos.data());
-	//cout << "lwr_tip_curr_pos POST\n" << lwr_tip_curr_pos << endl;
+	for (size_t i = 0; i < 7; i++)
+	{
+		lwr_desired_q(i) = lwr_curr_q_vector[i] + lwr_q_dot(i) * time_step;
+	}
+	for (int i = 0; i < 7; i++) 
+		simSetJointTargetPosition(lwr_joint_handlers[i], rad2deg(lwr_desired_q(i)));
+	//{
+	//	float a;
+	//	simGetJointPosition(lwr_joint_handlers[i], &a);
+	//	float t =(a + 0.001) ;
+	//	simSetJointTargetPosition(lwr_joint_handlers[i], t);
+	//}
+
+	simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
+	sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
+	cout << "lwr_tip_curr_pos POST\n" << lwr_tip_curr_pos << endl;
 }
 
 void getOffset(void)
