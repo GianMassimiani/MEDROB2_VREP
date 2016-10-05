@@ -70,6 +70,7 @@ using namespace chai3d;
 #include "../DeviceState.h" //! Improve
 #include "Tissue.h"
 #include "utility.h"
+#include "robot_utilities.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -153,6 +154,7 @@ simFloat resolution = 5.0;
 simInt vel_graph_handler;
 simInt force_graph_handler;
 simInt UI_handler;
+std::vector<simInt> joint_handlers;
 simInt aux_val[2] = { NULL, NULL };
 simInt button_handler;
 simChar* current_controller = "Position/Position-Force Controller";
@@ -172,6 +174,10 @@ Matrix3f rot_offset;
 Matrix3f force_offset_rot;
 Vector3f F_mc;
 Vector3f tool_vel, tool_omega;
+VectorXf lwr_q_dot(7);
+MatrixXf lwr_J(6,7);
+std::vector<float> lwr_curr_q_vector;
+
 Vector3f approaching_dir;
 
 Matrix4f dummy_T;
@@ -182,12 +188,20 @@ Matrix3f K_m, B_m;
 //! Velocity Filtering
 const int buffer_vel_size = 3;
 typedef std::vector<Eigen::Vector3f> Vector3fVector;
-std::vector<Eigen::Vector3f> device_vel_vector (buffer_vel_size);
-std::vector<Eigen::Vector3f> tool_vel_vector(buffer_vel_size);
-std::vector<Eigen::Vector3f> device_mean_vel_vector(buffer_vel_size);
-std::vector<Eigen::Vector3f> tool_mean_vel_vector(buffer_vel_size);
 Vector3f device_LPF_vel(0.0, 0.0, 0.0);
+std::vector<Eigen::Vector3f> device_vel_vector (buffer_vel_size);
+std::vector<Eigen::Vector3f> device_mean_vel_vector(buffer_vel_size);
+
 Vector3f tool_LPF_vel(0.0, 0.0, 0.0);
+std::vector<Eigen::Vector3f> tool_vel_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> tool_mean_vel_vector(buffer_vel_size);
+
+Vector3f tool_LPF_omega(0.0, 0.0, 0.0);
+std::vector<Eigen::Vector3f> tool_omega_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> tool_mean_omega_vector(buffer_vel_size);
+
+
+
 
 // ---------------------------------------------------------------- //
 // ---------------------------------------------------------------- //
@@ -2196,6 +2210,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				zero_tmp.setZero();
 				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
 				LPFilter(tool_vel_vector, zero_tmp, tool_mean_vel_vector, tool_LPF_vel, true);
+				LPFilter(tool_omega_vector, zero_tmp, tool_mean_omega_vector, tool_LPF_omega, true);
 
 				first_press = false;
 			}
@@ -2206,10 +2221,11 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			sim2EigenVec3f(sim_tool_omega, tool_omega);
 
 			LPFilter(tool_vel_vector, tool_vel, tool_mean_vel_vector, tool_LPF_vel, false);
+			LPFilter(tool_omega_vector, tool_omega, tool_mean_omega_vector, tool_LPF_omega, false);
 
 			updatePose();
 			computeGlobalForce();
-			getContactPoint();
+			//getContactPoint();
 			break;
 		case 2:
 			if (first_press)
@@ -2358,6 +2374,35 @@ void updatePose(void)
 	tool_T.block<3, 1>(0, 3) = tool_pos;
 	eigen2SimTransf(tool_T, sim_tool_T);
 	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
+
+	//! ROBOT POSE
+	VectorXf total_tool_velocity(6), tool_pose(6), lwr_tip_curr_pose(6);
+	total_tool_velocity << tool_LPF_vel, tool_LPF_omega;
+
+	Vector3f tool_euler_angles(0.0, 0.0, 0.0), lwr_tip_curr_euler_angles(0.0, 0.0, 0.0), lwr_tip_curr_pos(0.0, 0.0, 0.0);
+	simGetObjectPosition(lwr_tip_handler, -1, lwr_tip_curr_pos.data());
+	simGetObjectOrientation(lwr_tip_handler, -1, lwr_tip_curr_euler_angles.data());
+	simGetObjectOrientation(tool_handler, -1, tool_euler_angles.data());
+
+	MatrixXf Kp(6,6);
+
+	cout << "hdfysafgkuakbefcgakhgfycgaygsdbfcvmygasdcfas\n" << tool_euler_angles << endl;
+	
+	tool_pose << tool_pos, tool_euler_angles;
+	lwr_tip_curr_pose << lwr_tip_curr_pos, lwr_tip_curr_euler_angles;
+
+
+	for (int i = 0; i < 7; i++)
+		simGetJointPosition(joint_handlers[i], &lwr_curr_q_vector[i]);
+	lwr_J = LWRGeometricJacobian(lwr_curr_q_vector);
+	computeNullSpaceVelocity(lwr_q_dot, total_tool_velocity, tool_pose, lwr_tip_curr_pose, lwr_J, Kp.setIdentity());
+
+	//cout << "lwr_tip_curr_pos PRE\n" << lwr_tip_curr_pos << endl;
+	for (int i = 0; i < 7; i++)
+		simSetJointTargetVelocity(joint_handlers[i], lwr_q_dot(i));
+
+	//simGetObjectPosition(lwr_tip_handler, -1, lwr_tip_curr_pos.data());
+	//cout << "lwr_tip_curr_pos POST\n" << lwr_tip_curr_pos << endl;
 }
 
 void getOffset(void)

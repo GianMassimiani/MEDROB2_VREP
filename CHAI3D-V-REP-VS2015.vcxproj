@@ -23,6 +23,7 @@
     <ClCompile Include="external\V-REP\common\luaFunctionData.cpp" />
     <ClCompile Include="external\V-REP\common\luaFunctionDataItem.cpp" />
     <ClCompile Include="external\V-REP\common\v_repLib.cpp" />
+    <ClCompile Include="src\robot_utilities.cpp" />
     <ClCompile Include="src\Tissue.cpp" />
     <ClCompile Include="src\utility.cpp" />
     <ClCompile Include="src\v_repExtCHAI3D.cpp" />
@@ -34,6 +35,7 @@
     <ClInclude Include="external\V-REP\include\v_repConst.h" />
     <ClInclude Include="external\V-REP\include\v_repLib.h" />
     <ClInclude Include="external\V-REP\include\v_repTypes.h" />
+    <ClInclude Include="src\robot_utilities.h" />
     <ClInclude Include="src\Tissue.h" />
     <ClInclude Include="src\utility.h" />
     <ClInclude Include="src\v_repExtCHAI3D.h" />
