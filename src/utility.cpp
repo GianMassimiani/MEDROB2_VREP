@@ -85,6 +85,55 @@ void sim2EigenVec3f(const float* in, Vector3f& out)
 	out(2) = in[2];
 }
 
+
+void eigen2SimVec6f(const Vector6f& in, float* out)
+{
+	out[0] = in(0);
+	out[1] = in(1);
+	out[2] = in(2);
+	out[3] = in(3);
+	out[4] = in(4);
+	out[5] = in(5);
+}
+void sim2EigenVec6f(const float* in, Vector6f& out)
+{
+	out(0) = in[0];
+	out(1) = in[1];
+	out(2) = in[2];
+	out(3) = in[3];
+	out(4) = in[4];
+	out(5) = in[5];
+}
+
+void eigen2SimVec7f(const Vector7f& in, float* out)
+{
+	out[0] = in(0);
+	out[1] = in(1);
+	out[2] = in(2);
+	out[3] = in(3);
+	out[4] = in(4);
+	out[5] = in(5);
+	out[6] = in(6);
+}
+void sim2EigenVec7f(const float* in, Vector7f& out)
+{
+	out(0) = in[0];
+	out(1) = in[1];
+	out(2) = in[2];
+	out(3) = in[3];
+	out(4) = in[4];
+	out(5) = in[5];
+	out(6) = in[6];
+}
+
+
+
+
+
+
+
+
+
 void simComposeTransform(const float* in_rot, const float* in_pos, float* out_T)
 {
 	Matrix4f temp_T;

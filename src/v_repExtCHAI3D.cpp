@@ -144,7 +144,7 @@ Tissue tis;
 simFloat tool_size[3] = {
 	(float)0.03,
 	(float)0.03,
-	(float)0.095};
+	(float)0.1};
 simInt dummy_handler;
 simInt tool_handler;
 simInt tool_tip_handler;
@@ -2093,7 +2093,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// Create a cursor (cone) to be associated to the dummy. 
 		// A virtual coupling is implemented between the dummy and the tool.
-		tool_handler = simCreatePureShape(3, 31, tool_size, (float)0.001, NULL);
+		tool_handler = simCreatePureShape(3, 31-8, tool_size, (float)0.001, NULL);
 		// TODO: include inertia values -> FULL VREP_LIB REQUIRED
 		//simComputeMassAndInertia(tool_handler, 7860); 
 		simSetObjectParent(tool_handler, -1, true);
@@ -2129,7 +2129,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		orientation.col(2) = -device_state.rot.col(0);
 
 		temp.block<3, 3>(0, 0) = orientation;
-		temp.block<3, 1>(0, 3) = Vector3f(0.25f, 0.15f, 0.7f);
+		temp.block<3, 1>(0, 3) = Vector3f(0.55217f, -0.38138f, 0.86344f);
 		eigen2SimTransf(temp, scaled_tool_T);
 		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
 
@@ -2141,10 +2141,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// LWR target init
 		lwr_target_handler = simGetObjectHandle("Target");
-		simSetObjectMatrix(lwr_target_handler, -1, sim_tool_tip_T);
-		//simSetObjectMatrix(lwr_target_handler, -1, scaled_tool_T); // displacement??
-		simSetObjectParent(lwr_target_handler, tool_tip_handler, true);
-		simSetObjectIntParameter(lwr_target_handler, 10, 0); // not visible
+		simSetObjectParent(lwr_target_handler, -1, true);
 
 		//LWR tip init
 		lwr_tip_handler = simGetObjectHandle("Tip");
@@ -2174,8 +2171,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		}
 
 		cout << "Finish setup" << endl;
-		time_step = simGetSimulationTimeStep();
-
 	}
 
 
@@ -2189,6 +2184,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	// ------------------------------------------------------------------------- //
 	if (simGetSimulationState() == sim_simulation_advancing_running)
 	{
+		time_step = simGetSimulationTimeStep();
 		// Read the state of the haptic device 
 		// (position, rotation, velocity in the virtual RF)
 		chai3DReadState(DEVICE_IDX, device_state);
@@ -2253,7 +2249,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		case 3:
 			if (first_press)
 			{
-				simSetObjectParent(lwr_target_handler, -1, true);
 				float sim_lwr_tip_T[12];
 				Matrix4f lwr_tip_T;
 				simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
@@ -2269,7 +2264,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
-			simSetObjectParent(lwr_target_handler, tool_tip_handler, true);
+
 
 			global_device_force.setZero();
 		}
@@ -2389,70 +2384,175 @@ void updatePose(void)
 	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
 
 
+	// -------------------------------------------------------------//
+	//! ---------------------- ROBOT POSE --------------------------//
+	// -------------------------------------------------------------//
+	//! eliminare il target (ora inutile)
 
-	//! ROBOT POSE
-	Vector3f tool_euler_angles, lwr_tip_curr_euler_angles, lwr_tip_curr_pos;
-	VectorXf total_tool_velocity(6), tool_pose(6), lwr_tip_curr_pose(6);
-	MatrixXf Kp(6, 6);
-	total_tool_velocity << tool_LPF_vel, tool_LPF_omega;
+	Vector6f tool_tip_r_dot_d;
+	Vector3f tool_tip_lin_vel, tool_tip_ang_vel;
 
-	float sim_lwr_tip_curr_euler_angles[3];
-	float sim_lwr_tip_curr_pos[3];
-	float sim_tool_euler_angles[3];
+	Vector7f lwr_current_q, lwr_q_dot, lwr_q;
+	Matrix6_7f lwr_J;
 
-	simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
-	simGetObjectOrientation(lwr_tip_handler, -1, sim_lwr_tip_curr_euler_angles);
-	simGetObjectOrientation(tool_handler, -1, sim_tool_euler_angles);
+	Matrix4f tool_tip_T, lwr_tip_T;
+	Matrix6f K_p;
+	K_p.setIdentity();
+	K_p = K_p * 0.6f;
+	K_p.block<3, 3>(3, 0).setZero();
 
-	sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
-	sim2EigenVec3f(sim_lwr_tip_curr_euler_angles, lwr_tip_curr_euler_angles);
-	sim2EigenVec3f(sim_tool_euler_angles, tool_euler_angles);
-	
-	tool_pose << tool_pos, deg2radVec(tool_euler_angles);
-	lwr_tip_curr_pose << lwr_tip_curr_pos, deg2radVec(lwr_tip_curr_euler_angles);
+	float sim_tool_tip_T[12];
+	float sim_lwr_tip_T[12];
+	float sim_tool_tip_lin_vel[3];
+	float sim_tool_tip_ang_vel[3];
+	float sim_lwr_current_q[7];
+	float sim_lwr_q[7];
 
-	float tmp;
-	lwr_curr_q_vector.clear();
+	//! get raw data
 	for (int i = 0; i < 7; i++)
-	{
-		simGetJointPosition(lwr_joint_handlers[i], &tmp);
-		lwr_curr_q_vector.push_back(deg2rad(tmp));
-	}
+		simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_current_q[i]);
+	sim2EigenVec7f(sim_lwr_current_q, lwr_current_q);
 
-	lwr_J = LWRGeometricJacobian(lwr_curr_q_vector);
-	Kp.setIdentity();
-	computeNullSpaceVelocity(lwr_q_dot, total_tool_velocity, tool_pose, lwr_tip_curr_pose, lwr_J, Kp);
+	// tool_tip pose
+	simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
+	sim2EigenTransf(sim_tool_tip_T, tool_tip_T);
+	// lwr_tip pose
+	simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
+	sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
 
-	//cout << "lwr_curr_q_vector\n";
-	//for (int i = 0; i < lwr_curr_q_vector.size(); i++)
-	//{
-	//	cout << lwr_curr_q_vector[i] << endl;
-	//}
-	//cout << "total_tool_velocity\n" << total_tool_velocity << endl;
-	//cout << "tool_pose\n" << tool_pose << endl;
-	//cout << "lwr_tip_curr_pose\n" << lwr_tip_curr_pose << endl;
-	//cout << "lwr_J\n" << lwr_J << endl;
+	// tool-tip
+	simGetObjectVelocity(tool_tip_handler, sim_tool_tip_lin_vel, sim_tool_tip_ang_vel);
+	sim2EigenVec3f(sim_tool_tip_lin_vel, tool_tip_lin_vel);
+	sim2EigenVec3f(sim_tool_tip_ang_vel, tool_tip_ang_vel);
 
-	//cout << "lwr_tip_curr_pos PRE\n" << lwr_tip_curr_pos << endl;
+	tool_tip_r_dot_d << tool_tip_lin_vel, tool_tip_ang_vel;
+	//tool_tip_r_dot_d << tool_LPF_vel, tool_LPF_omega; // warning
+
+	//! Jac
+	lwr_J = LWRGeometricJacobian(lwr_current_q);
+
+	//! Compute q_dot
+	//lwr_q_dot = computeNSVel(tool_tip_r_dot_d, lwr_J);
+	computeNullSpaceVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
+
+	//! Linear integration
+	lwr_q = lwr_current_q + lwr_q_dot * time_step;
+
+	Vector7f a_vec, alpha_vec, d_vec;
+	Matrix4f T, T1;
+	setDHParameter(a_vec, alpha_vec, d_vec);
+	T = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_q, 7);
+	T1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_current_q, 7);
+	Vector3f ee_iniziale_pos = T1.block<3, 1>(0, 3);
+	Vector3f ee_calculated_pos = T.block<3, 1>(0, 3);
+
+	eigen2SimVec7f(lwr_q, sim_lwr_q);
+
+	//! Set target joint pos
+	for (int i = 0; i < 7; i++)
+		simSetJointTargetPosition(lwr_joint_handlers[i], sim_lwr_q[i]);
+
+	float sim_ee_calculated_pos[3];
+	eigen2SimVec3f(ee_iniziale_pos, sim_ee_calculated_pos);
+	simSetObjectPosition(lwr_target_handler, -1, sim_ee_calculated_pos);
+
+	//cout << "tool_tip_lin_vel\n" << tool_tip_lin_vel << endl;
+	//cout << "tool_tip_ang_vel\n" << tool_tip_ang_vel << endl;
+	//cout << "J:\n" << lwr_J << endl;
+
+	//cout << "EE - tool_pos:\n" << ee_calculated_pos - tool_pos << endl;
+	//cout << "q_dot calcolate:\n" << lwr_q_dot << endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//! MERDA
+	//simGetObjectPosition(tool_tip_handler, -1, sim_tool_tip_pos);
+	//simGetObjectOrientation(tool_tip_handler, -1, sim_tool_tip_euler_angles);
+	//sim2EigenVec3f(sim_tool_tip_pos, tool_tip_pos);
+	//sim2EigenVec3f(sim_tool_tip_euler_angles, tool_tip_euler_angles);
+	//tool_tip_pose << tool_tip_pos, tool_tip_euler_angles;
+
+	//simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_pos);
+	//simGetObjectOrientation(tool_tip_handler, -1, sim_lwr_tip_euler_angles);
+	//sim2EigenVec3f(sim_lwr_tip_pos, lwr_tip_pos);
+	//sim2EigenVec3f(sim_lwr_tip_euler_angles, lwr_tip_euler_angles);
+	//lwr_tip_pose << lwr_tip_pos, lwr_tip_euler_angles;
+
+
+	// MERDA DI IERI
+
+	//Vector3f tool_euler_angles, lwr_tip_curr_euler_angles, lwr_tip_curr_pos;
+	//VectorXf total_tool_velocity(6), tool_pose(6), lwr_tip_curr_pose(6);
+	//MatrixXf Kp(6, 6);
+	//total_tool_velocity << tool_LPF_vel, tool_LPF_omega;
+
+	//float sim_lwr_tip_curr_euler_angles[3];
+	//float sim_lwr_tip_curr_pos[3];
+	//float sim_tool_euler_angles[3];
+
+	//simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
+	//simGetObjectOrientation(lwr_tip_handler, -1, sim_lwr_tip_curr_euler_angles);
+	//simGetObjectOrientation(tool_handler, -1, sim_tool_euler_angles);
+
+	//sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
+	//sim2EigenVec3f(sim_lwr_tip_curr_euler_angles, lwr_tip_curr_euler_angles);
+	//sim2EigenVec3f(sim_tool_euler_angles, tool_euler_angles);
+	//
+	//tool_pose << tool_pos, deg2radVec(tool_euler_angles);
+	//lwr_tip_curr_pose << lwr_tip_curr_pos, deg2radVec(lwr_tip_curr_euler_angles);
+
+	//float tmp;
+	//lwr_curr_q_vector.clear();
 	//for (int i = 0; i < 7; i++)
-	//	simSetJointTargetVelocity(lwr_joint_handlers[i], lwr_q_dot(i));
-
-	for (size_t i = 0; i < 7; i++)
-	{
-		lwr_desired_q(i) = lwr_curr_q_vector[i] + lwr_q_dot(i) * time_step;
-	}
-	for (int i = 0; i < 7; i++) 
-		simSetJointTargetPosition(lwr_joint_handlers[i], rad2deg(lwr_desired_q(i)));
 	//{
-	//	float a;
-	//	simGetJointPosition(lwr_joint_handlers[i], &a);
-	//	float t =(a + 0.001) ;
-	//	simSetJointTargetPosition(lwr_joint_handlers[i], t);
+	//	simGetJointPosition(lwr_joint_handlers[i], &tmp);
+	//	lwr_curr_q_vector.push_back(deg2rad(tmp));
 	//}
 
-	simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
-	sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
-	cout << "lwr_tip_curr_pos POST\n" << lwr_tip_curr_pos << endl;
+	//lwr_J = LWRGeometricJacobian(lwr_curr_q_vector);
+	//Kp.setIdentity();
+	//computeNullSpaceVelocity(lwr_q_dot, total_tool_velocity, tool_pose, lwr_tip_curr_pose, lwr_J, Kp);
+
+	////cout << "lwr_curr_q_vector\n";
+	////for (int i = 0; i < lwr_curr_q_vector.size(); i++)
+	////{
+	////	cout << lwr_curr_q_vector[i] << endl;
+	////}
+	////cout << "total_tool_velocity\n" << total_tool_velocity << endl;
+	////cout << "tool_pose\n" << tool_pose << endl;
+	////cout << "lwr_tip_curr_pose\n" << lwr_tip_curr_pose << endl;
+	////cout << "lwr_J\n" << lwr_J << endl;
+
+	////cout << "lwr_tip_curr_pos PRE\n" << lwr_tip_curr_pos << endl;
+	////for (int i = 0; i < 7; i++)
+	////	simSetJointTargetVelocity(lwr_joint_handlers[i], lwr_q_dot(i));
+
+	//for (size_t i = 0; i < 7; i++)
+	//{
+	//	lwr_desired_q(i) = lwr_curr_q_vector[i] + lwr_q_dot(i) * time_step;
+	//}
+	//for (int i = 0; i < 7; i++) 
+	//	simSetJointTargetPosition(lwr_joint_handlers[i], rad2deg(lwr_desired_q(i)));
+	////{
+	////	float a;
+	////	simGetJointPosition(lwr_joint_handlers[i], &a);
+	////	float t =(a + 0.001) ;
+	////	simSetJointTargetPosition(lwr_joint_handlers[i], t);
+	////}
+
+	//simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
+	//sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
+	//cout << "lwr_tip_curr_pos POST\n" << lwr_tip_curr_pos << endl;
 }
 
 void getOffset(void)

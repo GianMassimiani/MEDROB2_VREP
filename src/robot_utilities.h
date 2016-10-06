@@ -10,21 +10,31 @@
 #include "v_repLib.h"
 #include "chai3d.h"
 #include "utility.h"
+
+typedef Eigen::Matrix<float, 6, 1> Vector6f;
+typedef Eigen::Matrix<float, 7, 1> Vector7f;
+typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+typedef Eigen::Matrix<float, 6, 7> Matrix6_7f;
+typedef Eigen::Matrix<float, 7, 6> Matrix7_6f;
+typedef Eigen::Matrix<float, 7, 7> Matrix7f;
 using namespace Eigen;
 
 Matrix4f linkCoordTransform(float a, float alpha, float d, float theta);
-Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord);
-Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord, int i_pos);
+Matrix4f cinematicaDiretta(Vector7f a_vec, Vector7f alpha_vec, Vector7f d_vec, Vector7f joint_coord);
+Matrix4f cinematicaDiretta(Vector7f a_vec, Vector7f alpha_vec, Vector7f d_vec, Vector7f joint_coord, int i_pos);
 
-MatrixXf jacobianoGeometrico(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord);
-void setDHParameter(int DOF_number, VectorXf& a_vec, VectorXf& alpha_vec, VectorXf& d_vec);
-MatrixXf LWRGeometricJacobian(std::vector<float>& lwr_joint_q);
+Matrix6_7f jacobianoGeometrico(Vector7f a_vec, Vector7f alpha_vec, Vector7f d_vec, Vector7f joint_coord);
+void setDHParameter(Vector7f& a_vec, Vector7f& alpha_vec, Vector7f& d_vec);
+Matrix6_7f LWRGeometricJacobian(const Vector7f lwr_joint_q);
 
-void computeNullSpaceVelocity(VectorXf& config_q_dot,
-	VectorXf& des_vel, VectorXf& des_pose, VectorXf& curr_pose,
-	MatrixXf& J, MatrixXf& Kp);
+Matrix7_6f pinv(const Matrix6_7f J);
+Matrix<float, 7, 3> pinv(const Matrix<float, 3, 7> J);
+Vector7f computeNSVel(Vector6f r_dot, Matrix6_7f J);
 
+void computeNullSpaceVelocity(Vector7f& config_q_dot,
+	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Matrix6_7f& J, const Matrix6f& Kp);
 
-void computeDLSVelocity(VectorXf& config_q_dot,
-	VectorXf& des_vel, VectorXf& des_pose, VectorXf& curr_pose,
-	MatrixXf& J, MatrixXf Kp, float mu);
+void computeDLSVelocity(Vector7f& config_q_dot,
+	Vector6f& des_vel, Vector6f& des_pose, Vector6f& curr_pose,
+	Matrix6_7f& J, Matrix6f Kp, float mu);

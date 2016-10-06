@@ -1,7 +1,7 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
-  v_repExtCHAI3D.cpp
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(51): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(52): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
+  robot_utilities.cpp
+c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(64): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
+c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(65): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
      Creazione della libreria ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
   Generazione codice in corso...
   Generazione codice terminata

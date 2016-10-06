@@ -18,6 +18,13 @@
 #include "chai3d.h"
 
 #define ARRAY_SIZE(array) (sizeof((array))/sizeof((array[0])))
+typedef Eigen::Matrix<float, 6, 1> Vector6f;
+typedef Eigen::Matrix<float, 7, 1> Vector7f;
+typedef Eigen::Matrix<float, 6, 6> Matrix6f;
+typedef Eigen::Matrix<float, 6, 7> Matrix6_7f;
+typedef Eigen::Matrix<float, 7, 6> Matrix7_6f;
+typedef Eigen::Matrix<float, 7, 7> Matrix7f;
+
 
 using namespace std;
 using namespace Eigen;
@@ -38,6 +45,12 @@ void sim2EigenRot(const float* in, Matrix3f& out);
 
 void eigen2SimVec3f(const Vector3f& in, float* out);
 void sim2EigenVec3f(const float* in, Vector3f& out);
+
+void eigen2SimVec6f(const Vector6f& in, float* out);
+void sim2EigenVec6f(const float* in, Vector6f& out);
+
+void eigen2SimVec7f(const Vector7f& in, float* out);
+void sim2EigenVec7f(const float* in, Vector7f& out);
 
 // This function given a R (3by3) and a P (3by1), builds a T (3by4).
 void simComposeTransform(const float* in_rot, const float* in_pos, float* out_T);

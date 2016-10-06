@@ -33,7 +33,7 @@ Matrix4f linkCoordTransform(float a, float alpha, float d, float theta)
 //funzione che restituisce la cinematica diretta del manipolatore espressa con una matrice di trasformazione
 //omogenea, in funzione del valore delle variabili di giunto, dei parametri cinematici e dei parametri
 //della notazione di Denavit-Hartemberg
-Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord)
+Matrix4f cinematicaDiretta(Vector7f a_vec, Vector7f alpha_vec, Vector7f d_vec, Vector7f joint_coord)
 {
 	Matrix4f result;
 
@@ -67,7 +67,7 @@ Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, V
 //funzione che restituisce la cinematica diretta del manipolatore CALCOLATA FINO AL GIUNTO i incluso (Ai-i,i inclusa),
 //espressa con una matrice di trasformazione omogenea, in funzione del valore delle variabili di giunto,
 //dei parametri cinematici e dei parametri della notazione di Denavit-Hartemberg
-Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord, int i_pos)
+Matrix4f cinematicaDiretta(Vector7f a_vec, Vector7f alpha_vec, Vector7f d_vec, Vector7f joint_coord, int i_pos)
 {
 	// VEDERE PERCHE NON FUNZIONA
 	Matrix4f result;
@@ -92,7 +92,7 @@ Matrix4f cinematicaDiretta(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, V
 
 
 //funzione che restituisce lo Jacobiano geometrico
-MatrixXf jacobianoGeometrico(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec, VectorXf joint_coord)
+Matrix6_7f jacobianoGeometrico(Vector7f a_vec, Vector7f alpha_vec, Vector7f d_vec, Vector7f joint_coord)
 {/*lo Jacobiano geometrico per il Kuka LWR è una matrice 6x7 ed assume la seguente espressione:
 
  | z0 x (p-p0)  z1 x (p-p1)  z2 x (p-p2)  z3 x (p-p3)  z4 x (p-p4)  z5 x (p-p5)  z6 x (p-p6)  |
@@ -116,7 +116,7 @@ MatrixXf jacobianoGeometrico(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec,
 	Matrix4f A_0_6 = cinematicaDiretta(a_vec, alpha_vec, d_vec, joint_coord, 6);
 	Matrix4f A_0_7 = cinematicaDiretta(a_vec, alpha_vec, d_vec, joint_coord, 7);  //cinematica diretta completa
 
-	Vector3f p = A_0_7.block<3, 1>(0, 3);
+	Vector3f p = A_0_7.block<3, 1>(0, 3); // EE
 
 	Vector3f p_1 = A_0_1.block<3, 1>(0, 3);
 	Vector3f p_2 = A_0_2.block<3, 1>(0, 3);
@@ -132,7 +132,7 @@ MatrixXf jacobianoGeometrico(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec,
 	Vector3f z_5 = A_0_5.block<3, 3>(0, 0) * z0;
 	Vector3f z_6 = A_0_6.block<3, 3>(0, 0) * z0;
 
-	MatrixXf result(6, 7);  //lo Jacobiano da restituire
+	Matrix6_7f result;  //lo Jacobiano da restituire
 
 							//blocco Jp1
 	result.block<3, 1>(0, 0) = z0.cross(p);
@@ -169,24 +169,19 @@ MatrixXf jacobianoGeometrico(VectorXf a_vec, VectorXf alpha_vec, VectorXf d_vec,
 
 
 //funzione che imposta i parametri di Denavit Hartenberg per il Kuka LWR
-void setDHParameter(int DOF_number, VectorXf& a_vec, VectorXf& alpha_vec, VectorXf& d_vec)
+void setDHParameter(Vector7f& a_vec, Vector7f& alpha_vec, Vector7f& d_vec)
 { 	//imposto i parametri cinematici del robot
-	float lung_0 = 115.0f;
-	float lung_1 = 200.0f;
-	float lung_2 = 200.0f;
-	float lung_3 = 200.0f;
-	float lung_4 = 200.0f;
-	float lung_5 = 190.0f;
-	float lung_7 = 112.0f;
-	float offset = 78.0f;
-
-
-	a_vec.resize(DOF_number);
-	alpha_vec.resize(DOF_number);
-	d_vec.resize(DOF_number);
+	float lung_0 = 115.0f / 1000.0f;
+	float lung_1 = 200.0f / 1000.0f;
+	float lung_2 = 200.0f / 1000.0f;
+	float lung_3 = 200.0f / 1000.0f;
+	float lung_4 = 200.0f / 1000.0f;
+	float lung_5 = 190.0f / 1000.0f;
+	float lung_7 = 112.0f / 1000.0f;
+	float offset = 78.0f / 1000.0f + 0.1f;
 
 	//inizializzazione dei parametri cinematici e dei parametri della notazione di Denavit-Hartenbger
-	a_vec.setZero(DOF_number);
+	a_vec.setZero();
 
 	alpha_vec(0) = (float)M_PI / 2;
 	alpha_vec(1) = (float)-M_PI / 2;
@@ -206,66 +201,152 @@ void setDHParameter(int DOF_number, VectorXf& a_vec, VectorXf& alpha_vec, Vector
 
 }
 
-MatrixXf LWRGeometricJacobian(std::vector<float>& lwr_joint_q)
+Matrix6_7f LWRGeometricJacobian(const Vector7f lwr_joint_q)
 { //strutture dati per i parametri di Denavit Hartenberg
-	VectorXf a_vec;
-	VectorXf alpha_vec;
-	VectorXf d_vec;
-	VectorXf joint_coord(7);
+	Vector7f a_vec;
+	Vector7f alpha_vec;
+	Vector7f d_vec;
+	Vector7f joint_coord;
 
 	for (int i = 0; i < 7; i++)
-		joint_coord(i) = lwr_joint_q[i];
+		joint_coord(i) = lwr_joint_q(i);
 
-	setDHParameter(lwr_joint_q.size(), a_vec, alpha_vec, d_vec);
+	setDHParameter(a_vec, alpha_vec, d_vec);
 
-	MatrixXf A = jacobianoGeometrico(a_vec, alpha_vec, d_vec, joint_coord);
+	Matrix6_7f A = jacobianoGeometrico(a_vec, alpha_vec, d_vec, joint_coord);
 	return A;
 }
 
 
-void computeNullSpaceVelocity(VectorXf& config_q_dot, 
-	VectorXf& des_vel, VectorXf& des_pose, VectorXf& curr_pose,
-	MatrixXf& J, MatrixXf& Kp)
+
+
+
+void computeNullSpaceVelocity(Vector7f& config_q_dot,
+	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Matrix6_7f& J, const Matrix6f& Kp)
 {
+	//! CARTESIAN ERROR
+	Vector3f error_pos, error_angle;
+	Vector6f total_error;
+	float sim_error_angle[3];
+	Matrix7_6f pinv_J = pinv(J);
 
-	MatrixXf J_t = J.transpose();
-	MatrixXf temp = J * J_t;
-	auto inv_temp = temp.inverse();
-	MatrixXf pinv_J = J_t * inv_temp;
-
-	VectorXf auxiliary_vector(7);
+	Vector7f auxiliary_vector;
 	for (int j = 0; j<7; j++)
 		auxiliary_vector(j) = (float)rand() / (float)RAND_MAX;
 
-	VectorXf range_space_velocities(7), null_space_velocities(7);
-	MatrixXf I(7, 7);
+	Vector7f range_space_velocities, null_space_velocities;
+	Matrix7f I;
 	I.setIdentity();
-	VectorXf r_dot(6);
-	r_dot = des_vel;
-	//cout << "r_dot\n" << r_dot << endl;
+	Vector6f r_dot;
+
+	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
+	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
+	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
+	float sim_error_R[9];
+	eigen2SimRot(error_R, sim_error_R);
+	simGetEulerAnglesFromMatrix(sim_error_R, sim_error_angle);
+	sim2EigenVec3f(sim_error_angle, error_angle);
+
+	total_error << error_pos, error_angle;
+	
+	if (error_pos.norm() <= 0.05)
+		r_dot = des_vel;
+	else
+		r_dot = des_vel + Kp * total_error;
+
+	cout << "total_error\n" << total_error << endl;
+
 	range_space_velocities = pinv_J * r_dot;
-	//cout << "range_space_velocities\n" << range_space_velocities << endl;
 	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
-	//cout << "null_space_velocities\n" << null_space_velocities << endl;
 
-	config_q_dot = range_space_velocities;
+	config_q_dot = range_space_velocities + null_space_velocities.setZero();
 }
 
-
-void computeDLSVelocity(VectorXf& config_q_dot,
-	VectorXf& des_vel, VectorXf& des_pose, VectorXf& curr_pose,
-	MatrixXf& J, MatrixXf Kp,float mu)
+Matrix7_6f pinv(const Matrix6_7f J)
 {
-	MatrixXf I(6, 6);
-	I.setIdentity();
-	VectorXf r_dot(6);
-	r_dot = des_vel + Kp *(des_pose - curr_pose);
+	Matrix7_6f pinv_J;
+	Matrix7_6f J_T;
+	J_T = J.transpose();
+	Matrix6f temp = J * J_T;
+	temp = temp.inverse();
 
-	MatrixXf J_t = J;
-	J_t.transpose();
-	MatrixXf A = (J * J_t + mu*mu*I);
-	config_q_dot = J_t * A.inverse() * r_dot;
+	pinv_J = J_T * temp;
+	return pinv_J;
+}
+
+Matrix<float,7,3> pinv(const Matrix<float, 3, 7> J)
+{
+	Matrix<float, 7, 3> pinv_J;
+	Matrix<float, 7, 3> J_T;
+	J_T = J.transpose();
+	Matrix3f temp = J * J_T;
+	temp = temp.inverse();
+
+	pinv_J = J_T * temp;
+	return pinv_J;
 }
 
 
 
+Vector7f computeNSVel(Vector6f r_dot, Matrix6_7f J)
+{
+	Matrix7_6f pinv_J = pinv(J);
+	Vector7f q_dot = pinv_J * r_dot;
+	return q_dot;
+}
+
+
+
+
+
+
+/*
+void computeNullSpaceVelocity_DISMISSED(Vector7f& config_q_dot,
+	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Matrix6_7f& J_full, const Matrix6f& Kp)
+{
+	//! CARTESIAN ERROR
+	Vector3f error_pos, error_angle;
+	Vector6f total_error;
+	float sim_error_angle[3];
+	Matrix<float, 3, 7> J = J_full.block<3, 7>(0, 0);
+	//Matrix7_6f pinv_J = pinv(J);
+	Matrix<float, 7, 3> pinv_J = pinv(J);
+
+	Vector7f auxiliary_vector;
+	for (int j = 0; j<7; j++)
+		auxiliary_vector(j) = (float)rand() / (float)RAND_MAX;
+
+	Vector7f range_space_velocities, null_space_velocities;
+	Matrix7f I;
+	I.setIdentity();
+	//Vector6f r_dot;
+	Vector3f r_dot;
+
+	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
+	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
+	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
+	float sim_error_R[9];
+	eigen2SimRot(error_R, sim_error_R);
+	simGetEulerAnglesFromMatrix(sim_error_R, sim_error_angle);
+	sim2EigenVec3f(sim_error_angle, error_angle);
+
+	total_error << error_pos, error_angle;
+
+	if (error_pos.norm() <= 0.05)
+		r_dot = des_vel.block<3, 1>(0, 0);
+	else
+		r_dot = des_vel.block<3, 1>(0, 0) + Kp.block<3, 3>(0, 0) * error_pos;
+
+	//cout << "total_error\n" << total_error << endl;
+	cout << "error_pos\n" << error_pos << endl;
+
+	range_space_velocities = pinv_J * r_dot;
+	//null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
+
+	config_q_dot = range_space_velocities + null_space_velocities.setZero();
+}
+
+
+/**/
