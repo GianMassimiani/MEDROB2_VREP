@@ -255,12 +255,12 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	else
 		r_dot = des_vel + Kp * total_error;
 
-	cout << "total_error\n" << total_error << endl;
-
 	range_space_velocities = pinv_J * r_dot;
 	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
 
-	config_q_dot = range_space_velocities + null_space_velocities.setZero();
+	cout << "error_angle\n" << error_angle << endl;
+
+	config_q_dot = range_space_velocities + null_space_velocities;
 }
 
 Matrix7_6f pinv(const Matrix6_7f J)
@@ -294,6 +294,43 @@ Vector7f computeNSVel(Vector6f r_dot, Matrix6_7f J)
 	Matrix7_6f pinv_J = pinv(J);
 	Vector7f q_dot = pinv_J * r_dot;
 	return q_dot;
+}
+
+void computeDLSVelocity(Vector7f& config_q_dot,
+	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Matrix6_7f& J, const Matrix6f& Kp)
+{
+	//! CARTESIAN ERROR
+	Vector3f error_pos, error_angle;
+	Vector6f total_error;
+	float sim_error_angle[3];
+
+	Matrix6f I;
+	I.setIdentity();
+
+	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
+	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
+	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
+	float sim_error_R[9];
+	eigen2SimRot(error_R, sim_error_R);
+	simGetEulerAnglesFromMatrix(sim_error_R, sim_error_angle);
+	sim2EigenVec3f(sim_error_angle, error_angle);
+	total_error << error_pos, error_angle;
+
+
+	//! r dot
+	Vector6f r_dot;
+	if (error_pos.norm() <= 0.05)
+		r_dot = des_vel;
+	else
+		r_dot = des_vel + Kp * total_error;
+
+	float mu = 0.5;
+
+	Matrix7_6f J_T = J.transpose();
+	Matrix6f temp = J * J_T + mu * mu * I;
+	temp = temp.inverse();
+	config_q_dot = J_T * temp * r_dot;
 }
 
 

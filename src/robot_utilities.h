@@ -36,5 +36,5 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	const Matrix6_7f& J, const Matrix6f& Kp);
 
 void computeDLSVelocity(Vector7f& config_q_dot,
-	Vector6f& des_vel, Vector6f& des_pose, Vector6f& curr_pose,
-	Matrix6_7f& J, Matrix6f Kp, float mu);
+	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Matrix6_7f& J, const Matrix6f& Kp);

@@ -2398,9 +2398,9 @@ void updatePose(void)
 	Matrix4f tool_tip_T, lwr_tip_T;
 	Matrix6f K_p;
 	K_p.setIdentity();
-	K_p = K_p * 0.6f;
+	K_p = K_p * 1.6f;
 	K_p.block<3, 3>(3, 0).setZero();
-
+	//K_p.setZero();
 	float sim_tool_tip_T[12];
 	float sim_lwr_tip_T[12];
 	float sim_tool_tip_lin_vel[3];
@@ -2434,6 +2434,7 @@ void updatePose(void)
 	//! Compute q_dot
 	//lwr_q_dot = computeNSVel(tool_tip_r_dot_d, lwr_J);
 	computeNullSpaceVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
+	//computeDLSVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
 
 	//! Linear integration
 	lwr_q = lwr_current_q + lwr_q_dot * time_step;
