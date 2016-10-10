@@ -153,6 +153,7 @@ simInt lwr_tip_handler;
 simFloat resolution = 5.0;
 simInt vel_graph_handler;
 simInt force_graph_handler;
+simInt test_graph_handler;
 simInt UI_handler;
 std::vector<simInt> lwr_joint_handlers;
 simInt aux_val[2] = { NULL, NULL };
@@ -179,7 +180,12 @@ MatrixXf lwr_J(6,7);
 VectorXf lwr_desired_q(7);
 std::vector<float> lwr_curr_q_vector;
 
-Vector3f approaching_dir;
+
+// For penetration
+Vector3f tool_tip_init_dir;
+Vector3f tool_tip_init_pos;
+Matrix4f lwr_tip_init_T;
+
 
 Matrix4f dummy_T;
 // UI parameters
@@ -203,6 +209,10 @@ std::vector<Eigen::Vector3f> tool_mean_omega_vector(buffer_vel_size);
 
 float time_step;
 
+// Fake movement parameters
+bool device_found = false;
+bool first_press_fake = true;
+float initial_dev_pos[3];
 
 
 // ---------------------------------------------------------------- //
@@ -243,6 +253,9 @@ void checkValues(int init_val,
 	int fin_val, 
 	float* param, 
 	float default_value);
+
+// fake movement functions declarations
+void moveFakeDevice(DeviceState& state);
 
 
 
@@ -2076,78 +2089,97 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	{
 		// Initialize the device
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
+		{
+			device_found = true;
 			cout << "Device found. Everithing OK ;)" << endl << endl;
-		else // TODO, a return here
+		}
+		else
+		{ // TODO, a return here
+			device_found = false;
+			first_press_fake = true;
 			cerr << endl << "***************WARNING****************"
-			<< endl << "******** Device not found! :( ********" << endl << endl;
+				<< endl << "******** Device not found! :( ********" << endl << endl;
+		}
 
 		// NOTE: the reference frames of the real haptic device and of the virtual 
 		// haptic device coincide. The relation between the real and virtual world 
 		// is an identity matrix. Anyway it is possible to scale the dimension of 
 		// the virtual WS setting the value WS_RADIUS.
 
-		// Create a dummy point to be graphically associated with the position of 
+		// retrieve the dummy point to be graphically associated with the position of 
 		// the haptic device in the virtual scene.
-		dummy_handler = simCreateDummy((float)0.1, NULL);
-		simSetObjectParent(dummy_handler, -1, true);
+		dummy_handler = simGetObjectHandle("Dummy_device");
+		//dummy_handler = simCreateDummy((float)0.05, NULL);
+		//simSetObjectParent(dummy_handler, -1, true);
 
-		// Create a cursor (cone) to be associated to the dummy. 
-		// A virtual coupling is implemented between the dummy and the tool.
-		tool_handler = simCreatePureShape(3, 31-8, tool_size, (float)0.001, NULL);
+		// Retrieve the tool dummy, which is associated to the center of the needle mounted on the robot.
+		tool_handler = simGetObjectHandle("Dummy_tool");
+		//tool_handler = simCreatePureShape(3, 31-8, tool_size, (float)0.001, NULL);
+
 		// TODO: include inertia values -> FULL VREP_LIB REQUIRED
 		//simComputeMassAndInertia(tool_handler, 7860); 
-		simSetObjectParent(tool_handler, -1, true);
+		//simSetObjectParent(tool_handler, -1, true);
 
-		// Create a "point puzzo" only to apply a rotation to the tip of the
-		// tool.
-		tool_tip_handler = simCreateDummy((float)0.01, NULL);
-		simSetObjectIntParameter(tool_tip_handler, 10, 0); // not visible
-		simSetObjectParent(tool_tip_handler, tool_handler, true);
+		// Retrieve the dummy to the tip of the tool. 
+		tool_tip_handler = simGetObjectHandle("Dummy_tool_tip");
+		//tool_tip_handler = simCreateDummy((float)0.05, NULL);
+		//simSetObjectIntParameter(tool_tip_handler, 10, 0); // not visible
+		//simSetObjectParent(tool_tip_handler, tool_handler, true);
 
+		//Retrive LWR tip dummy
+		lwr_tip_handler = simGetObjectHandle("Dummy_LWR_tip");
+		
 		// Graph
 		vel_graph_handler = simGetObjectHandle("Vel_graph");
 		force_graph_handler = simGetObjectHandle("Force_graph");
+		test_graph_handler = simGetObjectHandle("Test_graph");
 
-		// Read the state of the haptic device (position, rotation, velocity)
-		chai3DReadState(DEVICE_IDX, device_state);
-		device_state.print();
+		// INITIALIZE THE DEVICE
+		if (device_found)
+		{
+			// Read the state of the haptic device (position, rotation, velocity)
+			chai3DReadState(DEVICE_IDX, device_state);
+			device_state.print();
+		}
+		else
+		{
+			// IF THE DEVICE IS NOT FOUND, KEEP UPDATING THE DEVICE STATE AS THE DEVICE IS MOVING.
+			// Simulate the movement of the device and initialize device_state
+			// take the first device state position
+			simGetObjectPosition(dummy_handler, -1, initial_dev_pos);
+			initial_dev_pos[0] /= resolution;
+			initial_dev_pos[1] /= resolution;
+			initial_dev_pos[2] /= resolution;
+			moveFakeDevice(device_state); 
+		}
 
-		cout << endl << "Filtered Vel:\n" << device_state.vel << endl;
+		//cout << endl << "Filtered Vel:\n" << device_state.vel << endl;
 
-		// Set Dummy pose
+		// Set Dummy device pose as that of the device state
 		Matrix4f temp = device_state.T;
 		temp.block<3, 1>(0, 3) *= resolution;
 		float scaled_device_T[12];
 		eigen2SimTransf(temp, scaled_device_T);
 		simSetObjectMatrix(dummy_handler, -1, scaled_device_T);
 
-		// Set Cone pose
-		float scaled_tool_T[12];
-		Matrix3f orientation;
-		orientation = device_state.rot;
-		orientation.col(0) = device_state.rot.col(2);
-		orientation.col(2) = -device_state.rot.col(0);
-
-		temp.block<3, 3>(0, 0) = orientation;
-		temp.block<3, 1>(0, 3) = Vector3f(0.55217f, -0.38138f, 0.86344f);
-		eigen2SimTransf(temp, scaled_tool_T);
-		simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
+		// Set tool pose
+		//float scaled_tool_T[12];
+		//Matrix3f orientation;
+		//orientation = device_state.rot;
+		//orientation.col(0) = device_state.rot.col(2);
+		//orientation.col(2) = -device_state.rot.col(0);
+		//temp.block<3, 3>(0, 0) = orientation;
+		//temp.block<3, 1>(0, 3) = Vector3f(0.6f, 0.0f, 0.6f);
+		//eigen2SimTransf(temp, scaled_tool_T);
+		//simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
 
 		// Set Tool-tip position
-		float sim_tool_tip_T[12];
-		float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
-		simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
-		simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
+		//float sim_tool_tip_T[12];
+		//float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
+		//simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
+		//simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
 
-		// LWR target init
-		lwr_target_handler = simGetObjectHandle("Target");
-		simSetObjectParent(lwr_target_handler, -1, true);
-
-		//LWR tip init
-		lwr_tip_handler = simGetObjectHandle("Tip");
-
-
-
+		lwr_target_handler = simGetObjectHandle("Needle");
 
 		// TISSUE INIT
 		tis.init();
@@ -2161,7 +2193,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		//tis.printTissue();
 		//tis.renderLayers();
 
-		// JOINT HANDLERS
+		// retrieve JOINT HANDLERS
 		std::string temp_name;
 		for (int i = 1; i < 8; i++)
 		{
@@ -2185,10 +2217,19 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	if (simGetSimulationState() == sim_simulation_advancing_running)
 	{
 		time_step = simGetSimulationTimeStep();
-		// Read the state of the haptic device 
-		// (position, rotation, velocity in the virtual RF)
-		chai3DReadState(DEVICE_IDX, device_state);
-		//filterVelocity(device_vel_vector, device_state.vel, device_state.vel, false);
+
+		if (device_found)
+		{
+			// Read the state of the haptic device 
+			// (position, rotation, velocity in the virtual RF)
+			chai3DReadState(DEVICE_IDX, device_state);
+			//filterVelocity(device_vel_vector, device_state.vel, device_state.vel, false);
+		}
+		else
+		{
+			// Simulate the movement of the device and initialize device_state
+			moveFakeDevice(device_state);
+		}
 
 		float sim_tool_vel[3];
 		float sim_tool_omega[3];
@@ -2250,10 +2291,17 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			if (first_press)
 			{
 				float sim_lwr_tip_T[12];
-				Matrix4f lwr_tip_T;
+				float sim_tool_tip_T[12];
+				Matrix4f tool_tip_T;
 				simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
-				sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
-				approaching_dir = lwr_tip_T.block<3, 1>(0, 2);
+				simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
+
+				sim2EigenTransf(sim_lwr_tip_T, lwr_tip_init_T);
+				sim2EigenTransf(sim_tool_tip_T, tool_tip_T);
+
+				tool_tip_init_dir = tool_tip_T.block<3, 1>(0, 2);
+				tool_tip_init_pos = tool_tip_T.block<3, 1>(0, 3);
+
 				getOffset();
 				first_press = false;
 			}
@@ -2268,6 +2316,38 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			global_device_force.setZero();
 		}
+
+
+		if (!device_found)
+		{
+			if (first_press_fake)
+			{
+				simSetObjectParent(tool_handler, -1, true);
+				simSetObjectParent(tool_tip_handler, tool_handler, true);
+				getOffset();
+				
+				// clear velocity buffers
+				//Vector3f zero_tmp;
+				//zero_tmp.setZero();
+				//LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
+				//LPFilter(tool_vel_vector, zero_tmp, tool_mean_vel_vector, tool_LPF_vel, true);
+				//LPFilter(tool_omega_vector, zero_tmp, tool_mean_omega_vector, tool_LPF_omega, true);
+
+				first_press_fake = false;
+			}
+			//LPFilter(device_vel_vector, device_state.vel, device_mean_vel_vector, device_LPF_vel, false);
+
+			//simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
+			//sim2EigenVec3f(sim_tool_vel, tool_vel);
+			//sim2EigenVec3f(sim_tool_omega, tool_omega);
+
+			//LPFilter(tool_vel_vector, tool_vel, tool_mean_vel_vector, tool_LPF_vel, false);
+			//LPFilter(tool_omega_vector, tool_omega, tool_mean_omega_vector, tool_LPF_omega, false);
+
+			updatePose();
+			computeGlobalForce();
+		}
+
 
 		// COUT
 		want_to_print = false;
@@ -2341,23 +2421,28 @@ void updateRot(void)
 }
 void updatePosPenetration(void)
 {
-	/*
-	cout << "sono dentro" << endl;
-	Vector3f tool_tip_pos, lwr_target_proj_pos;
-	Vector3f approaching_dir_unitV = approaching_dir;
-	approaching_dir_unitV.normalize();
+	Vector3f tool_tip_pos, lwr_target_proj_pos, tool_tip_relative_increment;
+	float lwr_target_proj_magnitude;
 	float sim_tool_tip_pos[3];
-	float sim_lwr_target_proj_pos[3];
+	float sim_lwr_tip_curr_T[12];
+	Matrix4f lwr_tip_curr_T = lwr_tip_init_T;
+	Vector3f lwr_tip_dir;
+	Vector3f lwr_tip_init_pos;
+
+	lwr_tip_dir = lwr_tip_init_T.block<3, 1>(0, 2);
+	lwr_tip_init_pos = lwr_tip_init_T.block<3, 1>(0, 3);
 
 	simGetObjectPosition(tool_tip_handler, -1, sim_tool_tip_pos);
 	sim2EigenVec3f(sim_tool_tip_pos, tool_tip_pos); 
 
-	cout << "tool_tip_pos\n" << tool_tip_pos << endl;
-	cout << "approaching_dir\n" << approaching_dir << endl;
-	lwr_target_proj_pos = (tool_tip_pos.dot(approaching_dir_unitV)) * approaching_dir_unitV;
-	cout << "lwr_target_proj_pos\n" << lwr_target_proj_pos << endl;
-	eigen2SimVec3f(lwr_target_proj_pos, sim_lwr_target_proj_pos);
-	simSetObjectPosition(lwr_target_handler, -1, sim_lwr_target_proj_pos);/**/
+	tool_tip_relative_increment = tool_tip_pos - tool_tip_init_pos;
+	lwr_target_proj_magnitude = tool_tip_relative_increment.dot(tool_tip_init_dir);
+	lwr_target_proj_pos = lwr_tip_init_pos + lwr_target_proj_magnitude * lwr_tip_dir;
+
+	lwr_tip_curr_T.block<3, 1>(0, 3) = lwr_target_proj_pos;
+	eigen2SimTransf(lwr_tip_curr_T, sim_lwr_tip_curr_T);
+	simSetObjectMatrix(lwr_target_handler, -1, sim_lwr_tip_curr_T);
+
 
 	return; //placeholder
 }
@@ -2378,8 +2463,8 @@ void updatePose(void)
 	tool_pos = dummy_T.block<3,1>(0,3) + lin_offset; 
 	tool_rot = dummy_T.block<3,3>(0, 0) * rot_offset;
 
-	tool_T.block<3, 3>(0, 0) = tool_rot;
 	tool_T.block<3, 1>(0, 3) = tool_pos;
+	tool_T.block<3, 3>(0, 0) = tool_rot;
 	eigen2SimTransf(tool_T, sim_tool_T);
 	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
 
@@ -2388,7 +2473,7 @@ void updatePose(void)
 	//! ---------------------- ROBOT POSE --------------------------//
 	// -------------------------------------------------------------//
 	//! eliminare il target (ora inutile)
-
+	
 	Vector6f tool_tip_r_dot_d;
 	Vector3f tool_tip_lin_vel, tool_tip_ang_vel;
 
@@ -2439,13 +2524,13 @@ void updatePose(void)
 	//! Linear integration
 	lwr_q = lwr_current_q + lwr_q_dot * time_step;
 
-	Vector7f a_vec, alpha_vec, d_vec;
-	Matrix4f T, T1;
-	setDHParameter(a_vec, alpha_vec, d_vec);
-	T = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_q, 7);
-	T1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_current_q, 7);
-	Vector3f ee_iniziale_pos = T1.block<3, 1>(0, 3);
-	Vector3f ee_calculated_pos = T.block<3, 1>(0, 3);
+	//Vector7f a_vec, alpha_vec, d_vec;
+	//Matrix4f T, T1;
+	//setDHParameter(a_vec, alpha_vec, d_vec);
+	//T = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_q, 7);
+	//T1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_current_q, 7);
+	//Vector3f ee_iniziale_pos = T1.block<3, 1>(0, 3);
+	//Vector3f ee_calculated_pos = T.block<3, 1>(0, 3);
 
 	eigen2SimVec7f(lwr_q, sim_lwr_q);
 
@@ -2453,10 +2538,11 @@ void updatePose(void)
 	for (int i = 0; i < 7; i++)
 		simSetJointTargetPosition(lwr_joint_handlers[i], sim_lwr_q[i]);
 
-	float sim_ee_calculated_pos[3];
-	eigen2SimVec3f(ee_iniziale_pos, sim_ee_calculated_pos);
-	simSetObjectPosition(lwr_target_handler, -1, sim_ee_calculated_pos);
+	//float sim_ee_calculated_pos[3];
+	//eigen2SimVec3f(ee_iniziale_pos, sim_ee_calculated_pos);
+	//simSetObjectPosition(lwr_target_handler, -1, sim_ee_calculated_pos);
 
+	
 	//cout << "tool_tip_lin_vel\n" << tool_tip_lin_vel << endl;
 	//cout << "tool_tip_ang_vel\n" << tool_tip_ang_vel << endl;
 	//cout << "J:\n" << lwr_J << endl;
@@ -2464,96 +2550,6 @@ void updatePose(void)
 	//cout << "EE - tool_pos:\n" << ee_calculated_pos - tool_pos << endl;
 	//cout << "q_dot calcolate:\n" << lwr_q_dot << endl;
 
-
-
-
-
-
-
-
-
-
-
-
-
-	//! MERDA
-	//simGetObjectPosition(tool_tip_handler, -1, sim_tool_tip_pos);
-	//simGetObjectOrientation(tool_tip_handler, -1, sim_tool_tip_euler_angles);
-	//sim2EigenVec3f(sim_tool_tip_pos, tool_tip_pos);
-	//sim2EigenVec3f(sim_tool_tip_euler_angles, tool_tip_euler_angles);
-	//tool_tip_pose << tool_tip_pos, tool_tip_euler_angles;
-
-	//simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_pos);
-	//simGetObjectOrientation(tool_tip_handler, -1, sim_lwr_tip_euler_angles);
-	//sim2EigenVec3f(sim_lwr_tip_pos, lwr_tip_pos);
-	//sim2EigenVec3f(sim_lwr_tip_euler_angles, lwr_tip_euler_angles);
-	//lwr_tip_pose << lwr_tip_pos, lwr_tip_euler_angles;
-
-
-	// MERDA DI IERI
-
-	//Vector3f tool_euler_angles, lwr_tip_curr_euler_angles, lwr_tip_curr_pos;
-	//VectorXf total_tool_velocity(6), tool_pose(6), lwr_tip_curr_pose(6);
-	//MatrixXf Kp(6, 6);
-	//total_tool_velocity << tool_LPF_vel, tool_LPF_omega;
-
-	//float sim_lwr_tip_curr_euler_angles[3];
-	//float sim_lwr_tip_curr_pos[3];
-	//float sim_tool_euler_angles[3];
-
-	//simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
-	//simGetObjectOrientation(lwr_tip_handler, -1, sim_lwr_tip_curr_euler_angles);
-	//simGetObjectOrientation(tool_handler, -1, sim_tool_euler_angles);
-
-	//sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
-	//sim2EigenVec3f(sim_lwr_tip_curr_euler_angles, lwr_tip_curr_euler_angles);
-	//sim2EigenVec3f(sim_tool_euler_angles, tool_euler_angles);
-	//
-	//tool_pose << tool_pos, deg2radVec(tool_euler_angles);
-	//lwr_tip_curr_pose << lwr_tip_curr_pos, deg2radVec(lwr_tip_curr_euler_angles);
-
-	//float tmp;
-	//lwr_curr_q_vector.clear();
-	//for (int i = 0; i < 7; i++)
-	//{
-	//	simGetJointPosition(lwr_joint_handlers[i], &tmp);
-	//	lwr_curr_q_vector.push_back(deg2rad(tmp));
-	//}
-
-	//lwr_J = LWRGeometricJacobian(lwr_curr_q_vector);
-	//Kp.setIdentity();
-	//computeNullSpaceVelocity(lwr_q_dot, total_tool_velocity, tool_pose, lwr_tip_curr_pose, lwr_J, Kp);
-
-	////cout << "lwr_curr_q_vector\n";
-	////for (int i = 0; i < lwr_curr_q_vector.size(); i++)
-	////{
-	////	cout << lwr_curr_q_vector[i] << endl;
-	////}
-	////cout << "total_tool_velocity\n" << total_tool_velocity << endl;
-	////cout << "tool_pose\n" << tool_pose << endl;
-	////cout << "lwr_tip_curr_pose\n" << lwr_tip_curr_pose << endl;
-	////cout << "lwr_J\n" << lwr_J << endl;
-
-	////cout << "lwr_tip_curr_pos PRE\n" << lwr_tip_curr_pos << endl;
-	////for (int i = 0; i < 7; i++)
-	////	simSetJointTargetVelocity(lwr_joint_handlers[i], lwr_q_dot(i));
-
-	//for (size_t i = 0; i < 7; i++)
-	//{
-	//	lwr_desired_q(i) = lwr_curr_q_vector[i] + lwr_q_dot(i) * time_step;
-	//}
-	//for (int i = 0; i < 7; i++) 
-	//	simSetJointTargetPosition(lwr_joint_handlers[i], rad2deg(lwr_desired_q(i)));
-	////{
-	////	float a;
-	////	simGetJointPosition(lwr_joint_handlers[i], &a);
-	////	float t =(a + 0.001) ;
-	////	simSetJointTargetPosition(lwr_joint_handlers[i], t);
-	////}
-
-	//simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_curr_pos);
-	//sim2EigenVec3f(sim_lwr_tip_curr_pos, lwr_tip_curr_pos);
-	//cout << "lwr_tip_curr_pos POST\n" << lwr_tip_curr_pos << endl;
 }
 
 void getOffset(void)
@@ -2903,3 +2899,35 @@ void getContactPoint(void)
 	contact_force << contact_info[3], contact_info[4], contact_info[5];
 
 }
+
+void moveFakeDevice(DeviceState& state)
+{
+	// update device_state as if it is moved by the device.
+	// circular trajectory (roller coaster like)
+	float oriz_radius = (float)0.04;
+	float vert_radius = (float) 0.01;
+	float T = 80; // period
+	float t = simGetSimulationTime();
+	float angle =  (float)(t * (2.0f * M_PI) / T);
+	state.pos(0) = (float)initial_dev_pos[0] + oriz_radius * cos(angle);
+	state.pos(1) = (float)initial_dev_pos[1] + oriz_radius * sin(angle);
+	state.pos(2) = (float)initial_dev_pos[2] + vert_radius * sin(angle);
+
+	state.vel(0) = (float)-oriz_radius * sin(angle);
+	state.vel(1) = (float)oriz_radius * cos(angle);
+	state.vel(2) = (float)oriz_radius * cos(angle);
+
+	state.rot.setZero();
+	state.rot(0, 0) = sin(angle);
+	state.rot(1, 0) = -cos(angle);
+	state.rot(0, 1) = cos(angle);
+	state.rot(1, 1) = sin(angle);
+	state.rot(2, 2) = 1;
+
+	state.T.block<3, 3>(0, 0) = state.rot;
+	state.T(0, 3) = state.pos(0);
+	state.T(1, 3) = state.pos(1);
+	state.T(2, 3) = state.pos(2);
+}
+
+

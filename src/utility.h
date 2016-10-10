@@ -61,5 +61,5 @@ void simDecomposeTransform(const float* in_T, float* out_rot, float* out_pos);
 void simMultiplyVec3fByScalar(float* v, float k);
 VectorXf deg2radVec(VectorXf a);
 
-inline float rad2deg(float b) { return (b / M_PI * 180.0f); };
-inline float deg2rad(float a) { return (a / 180.0f * M_PI); };
+inline float rad2deg(float b) { return (float)((b / M_PI * 180.0f)); };
+inline float deg2rad(float a) { return (float)((a / 180.0f * M_PI)); };

@@ -1,13 +1,7 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
   v_repExtCHAI3D.cpp
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(64): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(65): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
      Creazione della libreria ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
   Generazione codice in corso...
   Generazione codice terminata
-DeviceState.obj : warning LNK4099: impossibile trovare il PDB 'vc140.pdb' con 'DeviceState.obj' o in 'C:\Program Files (x86)\V-REP3\V-REP_PRO_EDU\vc140.pdb'; oggetto collegato senza informazioni di debug
-luaFunctionData.obj : warning LNK4099: impossibile trovare il PDB 'vc140.pdb' con 'luaFunctionData.obj' o in 'C:\Program Files (x86)\V-REP3\V-REP_PRO_EDU\vc140.pdb'; oggetto collegato senza informazioni di debug
-luaFunctionDataItem.obj : warning LNK4099: impossibile trovare il PDB 'vc140.pdb' con 'luaFunctionDataItem.obj' o in 'C:\Program Files (x86)\V-REP3\V-REP_PRO_EDU\vc140.pdb'; oggetto collegato senza informazioni di debug
-v_repLib.obj : warning LNK4099: impossibile trovare il PDB 'vc140.pdb' con 'v_repLib.obj' o in 'C:\Program Files (x86)\V-REP3\V-REP_PRO_EDU\vc140.pdb'; oggetto collegato senza informazioni di debug
   CHAI3D-V-REP-VS2015.vcxproj -> C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll
   CHAI3D-V-REP-VS2015.vcxproj -> ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.pdb (Full PDB)
