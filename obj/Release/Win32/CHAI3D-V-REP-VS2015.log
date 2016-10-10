@@ -1,13 +1,5 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
-  DeviceState.cpp
-  luaFunctionData.cpp
-  luaFunctionDataItem.cpp
-  v_repLib.cpp
   utility.cpp
-  v_repExtCHAI3D.cpp
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(64): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
-c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(65): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
-src\v_repExtCHAI3D.cpp(2985): warning C4244: 'inizializzazione': conversione da 'double' a 'float'. Possibile perdita di dati.
      Creazione della libreria ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
 v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "class Eigen::Matrix<float,7,1,0,7,1> __cdecl computeNSVel(class Eigen::Matrix<float,6,1,0,6,1>,class Eigen::Matrix<float,6,7,0,6,7>)" (?computeNSVel@@YA?AV?$Matrix@M$06$00$0A@$06$00@Eigen@@V?$Matrix@M$05$00$0A@$05$00@2@V?$Matrix@M$05$06$0A@$05$06@2@@Z) non risolto
 v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "void __cdecl sim2EigenVec7f(float const *,class Eigen::Matrix<float,7,1,0,7,1> &)" (?sim2EigenVec7f@@YAXPBMAAV?$Matrix@M$06$00$0A@$06$00@Eigen@@@Z) non risolto
