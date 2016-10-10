@@ -1,36 +1,21 @@
-﻿Build started 27/09/2016 22:42:34.
-     1>Project "C:\chai3d-3.1.1\modules\V-REP_proj\CHAI3D-V-REP-VS2015.vcxproj" on node 2 (Build target(s)).
-     1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
-     1>ClCompile:
-         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\CL.exe /c /I"external\V-REP\include" /I..\..\src /I..\..\external\glew\include /I..\..\external\Eigen /Zi /nologo /W3 /WX- /O2 /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _WINDOWS /D _USRDLL /D _WINDLL /D _MBCS /GF /Gm- /EHsc /MD /GS- /Gy- /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"obj/Release/Win32\\" /Fd"obj/Release/Win32\vc140.pdb" /Gd /TP /wd4996 /analyze- /errorReport:prompt src\v_repExtCHAI3D.cpp
-         v_repExtCHAI3D.cpp
-     1>src\v_repExtCHAI3D.cpp(142): warning C4838: conversion from 'double' to 'simFloat' requires a narrowing conversion
-     1>src\v_repExtCHAI3D.cpp(142): warning C4305: 'initializing': truncation from 'double' to 'simFloat'
-     1>src\v_repExtCHAI3D.cpp(1210): warning C4244: 'argument': conversion from 'simFloat' to 'unsigned int', possible loss of data
-     1>src\v_repExtCHAI3D.cpp(1211): warning C4244: 'argument': conversion from 'simFloat' to 'unsigned int', possible loss of data
-     1>src\v_repExtCHAI3D.cpp(2011): warning C4305: 'argument': truncation from 'double' to 'simFloat'
-     1>src\v_repExtCHAI3D.cpp(2016): warning C4305: 'argument': truncation from 'double' to 'simFloat'
-     1>src\v_repExtCHAI3D.cpp(2225): warning C4101: 'dummy_transf_inv': unreferenced local variable
-     1>src\v_repExtCHAI3D.cpp(2222): warning C4101: 'offset_T': unreferenced local variable
-     1>src\v_repExtCHAI3D.cpp(2265): warning C4305: 'initializing': truncation from 'double' to 'float'
-     1>src\v_repExtCHAI3D.cpp(2278): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-     1>src\v_repExtCHAI3D.cpp(2283): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-       Link:
-         C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll" /INCREMENTAL:NO /NOLOGO /LIBPATH:..\..\lib\Release\Win32 chai3d.lib opengl32.lib glu32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /Debug /PDB:"..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.pdb" /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /LTCG:incremental /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib" /MACHINE:X86 /SAFESEH /DLL obj/Release/Win32\DeviceState.obj
-         obj/Release/Win32\luaFunctionData.obj
-         obj/Release/Win32\luaFunctionDataItem.obj
-         obj/Release/Win32\v_repLib.obj
-         obj/Release/Win32\utility.obj
-         obj/Release/Win32\v_repExtCHAI3D.obj
-            Creating library ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib and object ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
-         Generating code
-     1>c:\chai3d-3.1.1\modules\v-rep_proj\devicestate.cpp(82): warning C4172: returning address of local variable or temporary: transform_matrix
-     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(2151): warning C4172: returning address of local variable or temporary: transform_matrix
-     1>c:\chai3d-3.1.1\modules\v-rep_proj\src\v_repextchai3d.cpp(1842): warning C4715: 'chai3DGetButton': not all control paths return a value
-         Finished generating code
-         CHAI3D-V-REP-VS2015.vcxproj -> C:\chai3d-3.1.1\modules\V-REP_proj\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll
-     1>Done Building Project "C:\chai3d-3.1.1\modules\V-REP_proj\CHAI3D-V-REP-VS2015.vcxproj" (Build target(s)).
-
-Build succeeded.
-
-Time Elapsed 00:00:09.70
+﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
+  DeviceState.cpp
+  luaFunctionData.cpp
+  luaFunctionDataItem.cpp
+  v_repLib.cpp
+  utility.cpp
+  v_repExtCHAI3D.cpp
+c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(64): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
+c:\users\istin\documents\chai3d\modules\medrob2_vrep\src\utility.h(65): warning C4244: 'return': conversione da 'double' a 'float'. Possibile perdita di dati.
+src\v_repExtCHAI3D.cpp(2985): warning C4244: 'inizializzazione': conversione da 'double' a 'float'. Possibile perdita di dati.
+     Creazione della libreria ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "class Eigen::Matrix<float,7,1,0,7,1> __cdecl computeNSVel(class Eigen::Matrix<float,6,1,0,6,1>,class Eigen::Matrix<float,6,7,0,6,7>)" (?computeNSVel@@YA?AV?$Matrix@M$06$00$0A@$06$00@Eigen@@V?$Matrix@M$05$00$0A@$05$00@2@V?$Matrix@M$05$06$0A@$05$06@2@@Z) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "void __cdecl sim2EigenVec7f(float const *,class Eigen::Matrix<float,7,1,0,7,1> &)" (?sim2EigenVec7f@@YAXPBMAAV?$Matrix@M$06$00$0A@$06$00@Eigen@@@Z) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "public: int __thiscall Tissue::getLayerHandler(class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >)" (?getLayerHandler@Tissue@@QAEHV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "public: void __thiscall Tissue::addLayer(class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >,float,float,float)" (?addLayer@Tissue@@QAEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@MMM@Z) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "public: void __thiscall Tissue::init(void)" (?init@Tissue@@QAEXXZ) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "public: __thiscall Tissue::~Tissue(void)" (??1Tissue@@QAE@XZ) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "public: __thiscall Tissue::Tissue(void)" (??0Tissue@@QAE@XZ) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "class Eigen::Matrix<float,6,7,0,6,7> __cdecl LWRGeometricJacobian(class Eigen::Matrix<float,7,1,0,7,1>)" (?LWRGeometricJacobian@@YA?AV?$Matrix@M$05$06$0A@$05$06@Eigen@@V?$Matrix@M$06$00$0A@$06$00@2@@Z) non risolto
+v_repExtCHAI3D.obj : error LNK2001: simbolo esterno "void __cdecl eigen2SimVec7f(class Eigen::Matrix<float,7,1,0,7,1> const &,float *)" (?eigen2SimVec7f@@YAXABV?$Matrix@M$06$00$0A@$06$00@Eigen@@PAM@Z) non risolto
+..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll : fatal error LNK1120: 9 esterni non risolti
