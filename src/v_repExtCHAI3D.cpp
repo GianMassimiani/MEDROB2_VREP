@@ -161,7 +161,7 @@ simInt button_handler;
 simChar* current_controller = "Position/Position-Force Controller";
 
 bool want_to_print = false;
-int button;
+int button = 0, prev_button = 0;
 bool first_press = true;
 int global_cnt = 0;
 
@@ -226,7 +226,7 @@ void updateRot(void);
 void updatePosPenetration(void); // o.O
 void updatePose(void);
 void getOffset(void);
-
+void updateRobotPose(int target_handler);
 void getContactPoint(void);
 
 // Force functions
@@ -1957,6 +1957,45 @@ void LUA_READ_BUTTONS_CALLBACK(SLuaCallBack* p)
 }
 
 
+// GUAI IN ARRIVO
+#define LUA_READ_CONTACT_INFO_COMMAND "simSalaBim"
+const int inArgs_READ_CONTACT_INFO[] = {
+	3,
+	sim_lua_arg_int | sim_lua_arg_table, 2,
+	sim_lua_arg_float | sim_lua_arg_table, 3,
+	sim_lua_arg_float | sim_lua_arg_table, 3
+};
+void LUA_READ_CONTACT_INFO_CALLBACK(SLuaCallBack* p)
+{
+	int objects_in_contact[2];
+	float constact_point[3];
+	float contact_force[3];
+
+	CLuaFunctionData data;
+	if (data.readDataFromLua(p, inArgs_READ_CONTACT_INFO, inArgs_READ_CONTACT_INFO[0], LUA_READ_CONTACT_INFO_COMMAND))
+	{
+		std::vector<CLuaFunctionDataItem>* outData = data.getInDataPtr();
+		
+		objects_in_contact[0] = outData->at(0).intData[0];
+		objects_in_contact[1] = outData->at(0).intData[1];
+
+		constact_point[0] = outData->at(1).floatData[0];
+		constact_point[1] = outData->at(1).floatData[1];
+		constact_point[2] = outData->at(1).floatData[2];
+
+		contact_force[0] = outData->at(2).floatData[0];
+		contact_force[1] = outData->at(2).floatData[1];
+		contact_force[2] = outData->at(2).floatData[2];
+
+		cout << "objects_in_contact" << objects_in_contact[0] << "\t" << objects_in_contact[1] << endl << endl;
+
+	}
+	p->outputArgCount = 0;
+	data.writeDataToLua(p);
+
+}
+// GUAI FINITI
+
 
 ///  \brief V-REP shared library initialization.
 
@@ -2011,6 +2050,11 @@ VREP_DLLEXPORT unsigned char v_repStart(void* reservedPointer, int reservedInt)
 	// register LUA commands
 
 	std::vector<int> inArgs;
+
+	// **************************** GUAI IN ARRIVO ***************************//
+	CLuaFunctionData::getInputDataForFunctionRegistration(inArgs_READ_CONTACT_INFO, inArgs);
+	simRegisterCustomLuaFunction(LUA_READ_CONTACT_INFO_COMMAND, strConCat("", LUA_READ_CONTACT_INFO_COMMAND, "(table_2 objectInContact,table_3 contactPt,table_3 forceDirectionAndAmplitude)"), &inArgs[0], LUA_READ_CONTACT_INFO_CALLBACK);
+	// **********************************************************************//
 
 	CLuaFunctionData::getInputDataForFunctionRegistration(inArgs_START, inArgs);
 	simRegisterCustomLuaFunction(LUA_START_COMMAND, strConCat("number result=", LUA_START_COMMAND, "(number deviceIndex,number toolRadius,number workspaceRadius)"), &inArgs[0], LUA_START_CALLBACK);
@@ -2127,7 +2171,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		//simSetObjectParent(tool_tip_handler, tool_handler, true);
 
 		//Retrive LWR tip dummy
-		lwr_tip_handler = simGetObjectHandle("Dummy_LWR_tip");
+		lwr_tip_handler = simGetObjectHandle("LWR_tip");
 		
 		// Graph
 		vel_graph_handler = simGetObjectHandle("Vel_graph");
@@ -2179,7 +2223,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		//simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
 		//simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
 
-		lwr_target_handler = simGetObjectHandle("Needle");
+		lwr_target_handler = simGetObjectHandle("LWR_Target");
 
 		// TISSUE INIT
 		tis.init();
@@ -2190,15 +2234,15 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		tis.setTissueCenter(Vector3f(0.0f, 0.5f, 0.45f));
 		tis.setScale(0.2f, 0.22f);
 		
-		//tis.printTissue();
-		//tis.renderLayers();
+		tis.printTissue();
+		tis.renderLayers();
 
 		// retrieve JOINT HANDLERS
 		std::string temp_name;
 		for (int i = 1; i < 8; i++)
 		{
 			temp_name = "LBR4p_joint" + std::to_string(i);
-			cout << temp_name << endl;
+			cout << temp_name + " initialized" << endl;
 			lwr_joint_handlers.push_back(simGetObjectHandle(temp_name.c_str()));
 		}
 
@@ -2244,7 +2288,13 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		
 		//! Buttons
 		button = chai3DGetButton(DEVICE_IDX);
-		Vector3d f;
+
+		if (prev_button != button && prev_button != 0)
+		{
+			first_press = true;
+			simSetObjectParent(tool_handler, -1, true);
+			simSetObjectParent(tool_tip_handler, tool_handler, true);
+		}
 
 		switch (button)
 		{
@@ -2274,8 +2324,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			LPFilter(tool_omega_vector, tool_omega, tool_mean_omega_vector, tool_LPF_omega, false);
 
 			updatePose();
+			updateRobotPose(tool_tip_handler);
 			computeGlobalForce();
-			//getContactPoint();
 			break;
 		case 2:
 			if (first_press)
@@ -2286,6 +2336,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			updateRot();
+			updateRobotPose(tool_tip_handler);
 			break;
 		case 3:
 			if (first_press)
@@ -2307,6 +2358,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			}
 			updatePose();
 			updatePosPenetration();
+			updateRobotPose(lwr_target_handler);
+			
+			getContactPoint();
 			break;
 		default:
 			first_press = true;
@@ -2316,6 +2370,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			global_device_force.setZero();
 		}
+
+		prev_button = button;
 
 
 		if (!device_found)
@@ -2467,89 +2523,6 @@ void updatePose(void)
 	tool_T.block<3, 3>(0, 0) = tool_rot;
 	eigen2SimTransf(tool_T, sim_tool_T);
 	simSetObjectMatrix(tool_handler, -1, sim_tool_T);
-
-
-	// -------------------------------------------------------------//
-	//! ---------------------- ROBOT POSE --------------------------//
-	// -------------------------------------------------------------//
-	//! eliminare il target (ora inutile)
-	
-	Vector6f tool_tip_r_dot_d;
-	Vector3f tool_tip_lin_vel, tool_tip_ang_vel;
-
-	Vector7f lwr_current_q, lwr_q_dot, lwr_q;
-	Matrix6_7f lwr_J;
-
-	Matrix4f tool_tip_T, lwr_tip_T;
-	Matrix6f K_p;
-	K_p.setIdentity();
-	K_p = K_p * 1.6f;
-	K_p.block<3, 3>(3, 0).setZero();
-	//K_p.setZero();
-	float sim_tool_tip_T[12];
-	float sim_lwr_tip_T[12];
-	float sim_tool_tip_lin_vel[3];
-	float sim_tool_tip_ang_vel[3];
-	float sim_lwr_current_q[7];
-	float sim_lwr_q[7];
-
-	//! get raw data
-	for (int i = 0; i < 7; i++)
-		simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_current_q[i]);
-	sim2EigenVec7f(sim_lwr_current_q, lwr_current_q);
-
-	// tool_tip pose
-	simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
-	sim2EigenTransf(sim_tool_tip_T, tool_tip_T);
-	// lwr_tip pose
-	simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
-	sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
-
-	// tool-tip
-	simGetObjectVelocity(tool_tip_handler, sim_tool_tip_lin_vel, sim_tool_tip_ang_vel);
-	sim2EigenVec3f(sim_tool_tip_lin_vel, tool_tip_lin_vel);
-	sim2EigenVec3f(sim_tool_tip_ang_vel, tool_tip_ang_vel);
-
-	tool_tip_r_dot_d << tool_tip_lin_vel, tool_tip_ang_vel;
-	//tool_tip_r_dot_d << tool_LPF_vel, tool_LPF_omega; // warning
-
-	//! Jac
-	lwr_J = LWRGeometricJacobian(lwr_current_q);
-
-	//! Compute q_dot
-	//lwr_q_dot = computeNSVel(tool_tip_r_dot_d, lwr_J);
-	computeNullSpaceVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
-	//computeDLSVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
-
-	//! Linear integration
-	lwr_q = lwr_current_q + lwr_q_dot * time_step;
-
-	//Vector7f a_vec, alpha_vec, d_vec;
-	//Matrix4f T, T1;
-	//setDHParameter(a_vec, alpha_vec, d_vec);
-	//T = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_q, 7);
-	//T1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_current_q, 7);
-	//Vector3f ee_iniziale_pos = T1.block<3, 1>(0, 3);
-	//Vector3f ee_calculated_pos = T.block<3, 1>(0, 3);
-
-	eigen2SimVec7f(lwr_q, sim_lwr_q);
-
-	//! Set target joint pos
-	for (int i = 0; i < 7; i++)
-		simSetJointTargetPosition(lwr_joint_handlers[i], sim_lwr_q[i]);
-
-	//float sim_ee_calculated_pos[3];
-	//eigen2SimVec3f(ee_iniziale_pos, sim_ee_calculated_pos);
-	//simSetObjectPosition(lwr_target_handler, -1, sim_ee_calculated_pos);
-
-	
-	//cout << "tool_tip_lin_vel\n" << tool_tip_lin_vel << endl;
-	//cout << "tool_tip_ang_vel\n" << tool_tip_ang_vel << endl;
-	//cout << "J:\n" << lwr_J << endl;
-
-	//cout << "EE - tool_pos:\n" << ee_calculated_pos - tool_pos << endl;
-	//cout << "q_dot calcolate:\n" << lwr_q_dot << endl;
-
 }
 
 void getOffset(void)
@@ -2891,13 +2864,7 @@ void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector
 
 void getContactPoint(void)
 {
-	int touched_objects_handlers[2];
-	float contact_info[6];
-	simGetContactInfo(sim_handle_all, sim_handle_all, global_cnt, touched_objects_handlers, contact_info);	
-	Vector3f contact_pos, contact_force;
-	contact_pos << contact_info[0], contact_info[1], contact_info[2];
-	contact_force << contact_info[3], contact_info[4], contact_info[5];
-
+	
 }
 
 void moveFakeDevice(DeviceState& state)
@@ -2931,3 +2898,83 @@ void moveFakeDevice(DeviceState& state)
 }
 
 
+void updateRobotPose(int target_handler)
+{
+	Vector6f target_r_dot_d;
+	Vector3f target_lin_vel, target_ang_vel;
+
+	Vector7f lwr_current_q, lwr_q_dot, lwr_q;
+	Matrix6_7f lwr_J;
+
+	Matrix4f lwr_tip_T, target_T;
+	Matrix6f K_p;
+	K_p.setIdentity();
+	K_p = K_p * 1.6f;
+	K_p.block<3, 3>(3, 0).setZero();
+	//K_p.setZero();
+
+	float sim_target_T[12];
+	float sim_target_lin_vel[3];
+	float sim_target_ang_vel[3];
+
+	float sim_lwr_tip_T[12];
+	float sim_lwr_current_q[7];
+	float sim_lwr_q[7];
+
+	//! get raw data
+	for (int i = 0; i < 7; i++)
+		simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_current_q[i]);
+	sim2EigenVec7f(sim_lwr_current_q, lwr_current_q);
+
+	// tool_tip pose
+	simGetObjectMatrix(lwr_target_handler, -1, sim_target_T);
+	sim2EigenTransf(sim_target_T, target_T);
+	// lwr_tip pose
+	simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
+	sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
+
+	// tool-tip
+	simGetObjectVelocity(tool_tip_handler, sim_target_lin_vel, sim_target_ang_vel);
+	sim2EigenVec3f(sim_target_lin_vel, target_lin_vel);
+	sim2EigenVec3f(sim_target_ang_vel, target_ang_vel);
+
+	target_r_dot_d << target_lin_vel, target_ang_vel;
+	//tool_tip_r_dot_d << tool_LPF_vel, tool_LPF_omega; // warning
+
+	//! Jac
+	lwr_J = LWRGeometricJacobian(lwr_current_q);
+
+	//! Compute q_dot
+	//lwr_q_dot = computeNSVel(tool_tip_r_dot_d, lwr_J);
+	computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, target_T, lwr_tip_T, lwr_J, K_p);
+	//computeDLSVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
+
+	//! Linear integration
+	lwr_q = lwr_current_q + lwr_q_dot * time_step;
+
+	//Vector7f a_vec, alpha_vec, d_vec;
+	//Matrix4f T, T1;
+	//setDHParameter(a_vec, alpha_vec, d_vec);
+	//T = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_q, 7);
+	//T1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_current_q, 7);
+	//Vector3f ee_iniziale_pos = T1.block<3, 1>(0, 3);
+	//Vector3f ee_calculated_pos = T.block<3, 1>(0, 3);
+
+	eigen2SimVec7f(lwr_q, sim_lwr_q);
+
+	//! Set target joint pos
+	for (int i = 0; i < 7; i++)
+		simSetJointTargetPosition(lwr_joint_handlers[i], sim_lwr_q[i]);
+
+	//float sim_ee_calculated_pos[3];
+	//eigen2SimVec3f(ee_iniziale_pos, sim_ee_calculated_pos);
+	//simSetObjectPosition(lwr_target_handler, -1, sim_ee_calculated_pos);
+
+
+	//cout << "tool_tip_lin_vel\n" << tool_tip_lin_vel << endl;
+	//cout << "tool_tip_ang_vel\n" << tool_tip_ang_vel << endl;
+	//cout << "J:\n" << lwr_J << endl;
+
+	//cout << "EE - tool_pos:\n" << ee_calculated_pos - tool_pos << endl;
+	//cout << "q_dot calcolate:\n" << lwr_q_dot << endl;
+}

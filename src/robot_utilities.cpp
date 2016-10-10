@@ -258,8 +258,6 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	range_space_velocities = pinv_J * r_dot;
 	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
 
-	cout << "error_angle\n" << error_angle << endl;
-
 	config_q_dot = range_space_velocities + null_space_velocities;
 }
 

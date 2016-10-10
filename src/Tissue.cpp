@@ -153,7 +153,7 @@ void Tissue::renderLayers(void)
 		curr_cube_pos << 0, 0, depth;
 		eigen2SimVec3f(curr_cube_pos, sim_curr_cube_pos);
 		float tmp[3] = { _scale[0], _scale[1], _layers[i]._thick };
-		_cube_handlers.push_back(simCreatePureShape(0, 17, tmp, 1.0, NULL));
+		_cube_handlers.push_back(simCreatePureShape(0, 9, tmp, 1.0, NULL)); //HERE
 		simSetObjectName(_cube_handlers[i], _layers[i]._name.c_str());
 		simSetShapeColor(_cube_handlers[i], NULL, sim_colorcomponent_ambient_diffuse, color_data.setRandom().data());
 		simSetObjectPosition(_cube_handlers[i], -1, sim_curr_cube_pos);
