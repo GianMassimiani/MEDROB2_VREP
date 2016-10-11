@@ -7,5 +7,5 @@
 *.lo
 *.o
 *.out
-.\obj\*
-.\.vs\*
+obj\*
+.vs\*
