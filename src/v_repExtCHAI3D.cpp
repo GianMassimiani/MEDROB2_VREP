@@ -2886,8 +2886,8 @@ void getContactPoint(void)
 		contact_points.push_back(contact_point);
 
 		
-		simSetObjectIntParameter(tis.getLayerHandler("Skin"), 3003, 50);
-		simSetObjectIntParameter(tis.getLayerHandler("Skin"), 3004, 50);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Skin"), sim_shapeintparam_static, 0);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Skin"), sim_shapeintparam_respondable, 0);
 
 		//END
 		objects_in_contact[1] = -1;
@@ -2897,8 +2897,9 @@ void getContactPoint(void)
 		cout << "contact_point FAT\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
 
-		simSetObjectIntParameter(tis.getLayerHandler("Fat"), 3003, 50);
-		simSetObjectIntParameter(tis.getLayerHandler("Fat"), 3004, 50);
+
+		simSetObjectInt32Parameter(tis.getLayerHandler("Fat"), sim_shapeintparam_static, 0);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Fat"), sim_shapeintparam_respondable, 0);
 
 		//END
 		objects_in_contact[1] = -1;
@@ -2908,8 +2909,8 @@ void getContactPoint(void)
 		cout << "contact_point MUSCLE\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
 
-		simSetObjectIntParameter(tis.getLayerHandler("Muscle"), 3003, 50);
-		simSetObjectIntParameter(tis.getLayerHandler("Muscle"), 3004, 50);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Muscle"), sim_shapeintparam_static, 0);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Muscle"), sim_shapeintparam_respondable, 0);
 
 		//END
 		objects_in_contact[1] = -1;
@@ -2919,8 +2920,8 @@ void getContactPoint(void)
 		cout << "contact_point BONE\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
 
-		simSetObjectIntParameter(tis.getLayerHandler("Bone"), 3003, 50);
-		simSetObjectIntParameter(tis.getLayerHandler("Bone"), 3004, 50);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Bone"), sim_shapeintparam_static, 0);
+		simSetObjectInt32Parameter(tis.getLayerHandler("Bone"), sim_shapeintparam_respondable, 0);
 
 		//END
 		objects_in_contact[1] = -1;
@@ -2996,7 +2997,7 @@ void updateRobotPose(int target_handler)
 	sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
 
 	// tool-tip
-	simGetObjectVelocity(tool_tip_handler, sim_target_lin_vel, sim_target_ang_vel);
+	simGetObjectVelocity(tool_tip_handler, sim_target_lin_vel, sim_target_ang_vel); //! modificare
 	sim2EigenVec3f(sim_target_lin_vel, target_lin_vel);
 	sim2EigenVec3f(sim_target_ang_vel, target_ang_vel);
 
