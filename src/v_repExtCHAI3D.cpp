@@ -2990,14 +2990,14 @@ void updateRobotPose(int target_handler)
 	sim2EigenVec7f(sim_lwr_current_q, lwr_current_q);
 
 	// tool_tip pose
-	simGetObjectMatrix(lwr_target_handler, -1, sim_target_T);
+	simGetObjectMatrix(target_handler, -1, sim_target_T);
 	sim2EigenTransf(sim_target_T, target_T);
 	// lwr_tip pose
 	simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
 	sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
 
 	// tool-tip
-	simGetObjectVelocity(tool_tip_handler, sim_target_lin_vel, sim_target_ang_vel); //! modificare
+	simGetObjectVelocity(target_handler, sim_target_lin_vel, sim_target_ang_vel); //! ??!?
 	sim2EigenVec3f(sim_target_lin_vel, target_lin_vel);
 	sim2EigenVec3f(sim_target_ang_vel, target_ang_vel);
 
