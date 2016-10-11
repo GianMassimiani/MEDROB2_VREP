@@ -180,14 +180,17 @@ MatrixXf lwr_J(6,7);
 VectorXf lwr_desired_q(7);
 std::vector<float> lwr_curr_q_vector;
 
+// Contact point
+int objects_in_contact[2];
+Vector3f contact_point;
+Vector3f contact_force;
 
 // For penetration
 Vector3f tool_tip_init_dir;
 Vector3f tool_tip_init_pos;
 Matrix4f lwr_tip_init_T;
-
-
 Matrix4f dummy_T;
+
 // UI parameters
 int controller_ID = 1;
 Matrix3f K_m, B_m;
@@ -1967,27 +1970,26 @@ const int inArgs_READ_CONTACT_INFO[] = {
 };
 void LUA_READ_CONTACT_INFO_CALLBACK(SLuaCallBack* p)
 {
-	int objects_in_contact[2];
-	float constact_point[3];
-	float contact_force[3];
-
 	CLuaFunctionData data;
 	if (data.readDataFromLua(p, inArgs_READ_CONTACT_INFO, inArgs_READ_CONTACT_INFO[0], LUA_READ_CONTACT_INFO_COMMAND))
 	{
+		float sim_contact_point[3];
+		float sim_contact_force[3];
 		std::vector<CLuaFunctionDataItem>* outData = data.getInDataPtr();
 		
 		objects_in_contact[0] = outData->at(0).intData[0];
 		objects_in_contact[1] = outData->at(0).intData[1];
 
-		constact_point[0] = outData->at(1).floatData[0];
-		constact_point[1] = outData->at(1).floatData[1];
-		constact_point[2] = outData->at(1).floatData[2];
+		sim_contact_point[0] = outData->at(1).floatData[0];
+		sim_contact_point[1] = outData->at(1).floatData[1];
+		sim_contact_point[2] = outData->at(1).floatData[2];
 
-		contact_force[0] = outData->at(2).floatData[0];
-		contact_force[1] = outData->at(2).floatData[1];
-		contact_force[2] = outData->at(2).floatData[2];
+		sim_contact_force[0] = outData->at(2).floatData[0];
+		sim_contact_force[1] = outData->at(2).floatData[1];
+		sim_contact_force[2] = outData->at(2).floatData[2];
 
-		cout << "objects_in_contact" << objects_in_contact[0] << "\t" << objects_in_contact[1] << endl << endl;
+		sim2EigenVec3f(sim_contact_point, contact_point);
+		sim2EigenVec3f(sim_contact_force, contact_force);
 
 	}
 	p->outputArgCount = 0;
@@ -2226,16 +2228,28 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		lwr_target_handler = simGetObjectHandle("LWR_Target");
 
 		// TISSUE INIT
+
+		Vector3f tissue_center;
+		Vector2f tissue_scale;
+		tissue_center << 0.0f, 0.65f, 0.55f;
+		tissue_scale << 0.2f, 0.22f;
 		tis.init();
 		tis.addLayer("Skin",	0.02f,	331.0f,		3.0f);
-		tis.addLayer("Fat",		0.02f,	83.0f,		1.0f);
-		tis.addLayer("Muscle",	0.02f,	497.0f,		3.0f);
+		tis.addLayer("Fat",		0.035f,	83.0f,		1.0f);
+		tis.addLayer("Muscle",	0.04f,	497.0f,		3.0f);
 		tis.addLayer("Bone",	0.02f,	2480.0f,	0.0f);
-		tis.setTissueCenter(Vector3f(0.0f, 0.5f, 0.45f));
-		tis.setScale(0.2f, 0.22f);
+		tis.setTissueCenter(tissue_center);
+		tis.setScale(tissue_scale(0), tissue_scale(1));
 		
 		tis.printTissue();
 		tis.renderLayers();
+
+		// Add a plane to substain the tissues
+		float tissue_depth = tis.getTotalDepth();
+		float plane_size[3] = { tissue_scale(0) * 2.0f, tissue_scale(1) * 2.0f, 0.04f };
+		float plane_pos[3] = { tissue_center(0), tissue_center(1), tissue_center(2) - tissue_depth * 0.5f - plane_size[2] * 0.5f };
+		int plane_handler = simCreatePureShape(0, 1 + 4 + 8 + 16, plane_size, 1.0f, NULL);
+		simSetObjectPosition(plane_handler, -1, plane_pos);
 
 		// retrieve JOINT HANDLERS
 		std::string temp_name;
@@ -2864,7 +2878,55 @@ void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector
 
 void getContactPoint(void)
 {
-	
+	//objects_in_contact contact_point;
+	Vector3fVector contact_points;
+	if (objects_in_contact[1] == tis.getLayerHandler("Skin"))
+	{
+		cout << "contact_point SKIN\n" << contact_point << endl << endl;
+		contact_points.push_back(contact_point);
+
+		
+		simSetObjectIntParameter(tis.getLayerHandler("Skin"), 3003, 50);
+		simSetObjectIntParameter(tis.getLayerHandler("Skin"), 3004, 50);
+
+		//END
+		objects_in_contact[1] = -1;
+	}
+	else if (objects_in_contact[1] == tis.getLayerHandler("Fat"))
+	{
+		cout << "contact_point FAT\n" << contact_point << endl << endl;
+		contact_points.push_back(contact_point);
+
+		simSetObjectIntParameter(tis.getLayerHandler("Fat"), 3003, 50);
+		simSetObjectIntParameter(tis.getLayerHandler("Fat"), 3004, 50);
+
+		//END
+		objects_in_contact[1] = -1;
+	}
+	else if (objects_in_contact[1] == tis.getLayerHandler("Muscle"))
+	{
+		cout << "contact_point MUSCLE\n" << contact_point << endl << endl;
+		contact_points.push_back(contact_point);
+
+		simSetObjectIntParameter(tis.getLayerHandler("Muscle"), 3003, 50);
+		simSetObjectIntParameter(tis.getLayerHandler("Muscle"), 3004, 50);
+
+		//END
+		objects_in_contact[1] = -1;
+	}
+	else if (objects_in_contact[1] == tis.getLayerHandler("Bone"))
+	{
+		cout << "contact_point BONE\n" << contact_point << endl << endl;
+		contact_points.push_back(contact_point);
+
+		simSetObjectIntParameter(tis.getLayerHandler("Bone"), 3003, 50);
+		simSetObjectIntParameter(tis.getLayerHandler("Bone"), 3004, 50);
+
+		//END
+		objects_in_contact[1] = -1;
+	}
+	else
+		return;
 }
 
 void moveFakeDevice(DeviceState& state)

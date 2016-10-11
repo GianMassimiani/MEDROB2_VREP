@@ -37,6 +37,7 @@ public:
 
 	inline void setTissueCenter(Eigen::Vector3f c) { _center_pos = c; };
 	inline void setScale(float h, float w) { _scale[0] = h; _scale[1] = w; };
+	inline float getTotalDepth(void) { return _d; };
 
 	void printTissue(void);
 

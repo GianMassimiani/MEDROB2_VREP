@@ -163,7 +163,7 @@ void Tissue::renderLayers(void)
 	float total_depth_total = 0;
 	for (int i = 0; i < _N; i++)
 		total_depth_total += _layers[i]._thick;
-
+	_d = total_depth_total;
 
 	//float half_total_depth = (depth + _layers[_N - 1]._thick / 2) / 2;
 	eigen2SimVec3f(Vector3f(0.0f, 0.0f, (_center_pos(2) - total_depth_total/2 - _layers[0]._thick/2)), sim_total_cube_pos);
