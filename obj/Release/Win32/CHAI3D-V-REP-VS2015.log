@@ -1,10 +1,5 @@
 ﻿C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V140\Microsoft.CppBuild.targets(368,5): warning MSB8004: Output Directory does not end with a trailing slash.  This build instance will add the slash as it is required to allow proper evaluation of the Output Directory.
   Tissue.cpp
-  robot_utilities.cpp
-  utility.cpp
+src\Tissue.cpp : fatal error C1041: non è possibile aprire il database di programma 'C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\obj\Release\Win32\vc140.pdb'; se più CL.EXE scrivono nello stesso file .PDB, usare /FS
   v_repExtCHAI3D.cpp
-     Creazione della libreria ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.lib e dell'oggetto ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.exp
-  Generazione codice in corso...
-  Generazione codice terminata
-  CHAI3D-V-REP-VS2015.vcxproj -> C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.dll
-  CHAI3D-V-REP-VS2015.vcxproj -> ..\..\..\..\..\..\Program Files (x86)\V-REP3\V-REP_PRO_EDU\v_repExtCHAI3D.pdb (Full PDB)
+src\v_repExtCHAI3D.cpp(2305): warning C4101: 'curr_layer_IDX': variabile locale senza riferimenti

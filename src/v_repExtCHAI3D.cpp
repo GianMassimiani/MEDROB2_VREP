@@ -184,6 +184,7 @@ std::vector<float> lwr_curr_q_vector;
 int objects_in_contact[2];
 Vector3f contact_point;
 Vector3f contact_force;
+Vector3f contact_normal;
 
 // For penetration
 Vector3f tool_tip_init_dir;
@@ -230,7 +231,7 @@ void updatePosPenetration(void); // o.O
 void updatePose(void);
 void getOffset(void);
 void updateRobotPose(int target_handler);
-void getContactPoint(void);
+void manageContact(void);
 
 // Force functions
 void computeGlobalForce(void);
@@ -1963,8 +1964,9 @@ void LUA_READ_BUTTONS_CALLBACK(SLuaCallBack* p)
 // GUAI IN ARRIVO
 #define LUA_READ_CONTACT_INFO_COMMAND "simSalaBim"
 const int inArgs_READ_CONTACT_INFO[] = {
-	3,
+	4,
 	sim_lua_arg_int | sim_lua_arg_table, 2,
+	sim_lua_arg_float | sim_lua_arg_table, 3,
 	sim_lua_arg_float | sim_lua_arg_table, 3,
 	sim_lua_arg_float | sim_lua_arg_table, 3
 };
@@ -1975,6 +1977,7 @@ void LUA_READ_CONTACT_INFO_CALLBACK(SLuaCallBack* p)
 	{
 		float sim_contact_point[3];
 		float sim_contact_force[3];
+		float sim_contact_normal[3];
 		std::vector<CLuaFunctionDataItem>* outData = data.getInDataPtr();
 		
 		objects_in_contact[0] = outData->at(0).intData[0];
@@ -1988,8 +1991,13 @@ void LUA_READ_CONTACT_INFO_CALLBACK(SLuaCallBack* p)
 		sim_contact_force[1] = outData->at(2).floatData[1];
 		sim_contact_force[2] = outData->at(2).floatData[2];
 
+		sim_contact_normal[0] = outData->at(3).floatData[0];
+		sim_contact_normal[1] = outData->at(3).floatData[1];
+		sim_contact_normal[2] = outData->at(3).floatData[2];
+
 		sim2EigenVec3f(sim_contact_point, contact_point);
 		sim2EigenVec3f(sim_contact_force, contact_force);
+		sim2EigenVec3f(sim_contact_normal, contact_normal);
 
 	}
 	p->outputArgCount = 0;
@@ -2055,7 +2063,7 @@ VREP_DLLEXPORT unsigned char v_repStart(void* reservedPointer, int reservedInt)
 
 	// **************************** GUAI IN ARRIVO ***************************//
 	CLuaFunctionData::getInputDataForFunctionRegistration(inArgs_READ_CONTACT_INFO, inArgs);
-	simRegisterCustomLuaFunction(LUA_READ_CONTACT_INFO_COMMAND, strConCat("", LUA_READ_CONTACT_INFO_COMMAND, "(table_2 objectInContact,table_3 contactPt,table_3 forceDirectionAndAmplitude)"), &inArgs[0], LUA_READ_CONTACT_INFO_CALLBACK);
+	simRegisterCustomLuaFunction(LUA_READ_CONTACT_INFO_COMMAND, strConCat("", LUA_READ_CONTACT_INFO_COMMAND, "(table_2 objectInContact,table_3 contactPt,table_3 forceDirectionAndAmplitude, table_3 contactN)"), &inArgs[0], LUA_READ_CONTACT_INFO_CALLBACK);
 	// **********************************************************************//
 
 	CLuaFunctionData::getInputDataForFunctionRegistration(inArgs_START, inArgs);
@@ -2245,11 +2253,16 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		tis.renderLayers();
 
 		// Add a plane to substain the tissues
+		float plane_color[3] = { 0.6f, 0.3f, 0.0f };
+		float trasparency[1] = { 0.2f };
 		float tissue_depth = tis.getTotalDepth();
 		float plane_size[3] = { tissue_scale(0) * 2.0f, tissue_scale(1) * 2.0f, 0.04f };
 		float plane_pos[3] = { tissue_center(0), tissue_center(1), tissue_center(2) - tissue_depth * 0.5f - plane_size[2] * 0.5f };
 		int plane_handler = simCreatePureShape(0, 1 + 4 + 8 + 16, plane_size, 1.0f, NULL);
 		simSetObjectPosition(plane_handler, -1, plane_pos);
+		simSetShapeColor(plane_handler, NULL, sim_colorcomponent_ambient_diffuse, plane_color);
+		simSetShapeColor(plane_handler, NULL, sim_colorcomponent_transparency, trasparency);
+		simSetObjectName(plane_handler, "Desk");
 
 		// retrieve JOINT HANDLERS
 		std::string temp_name;
@@ -2289,9 +2302,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			moveFakeDevice(device_state);
 		}
 
+		int curr_layer_IDX;
+
 		float sim_tool_vel[3];
 		float sim_tool_omega[3];
-
 		float sim_dummy_T[12];
 
 		// Scaling by resolution
@@ -2308,6 +2322,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
+			tis.resetRendering();
 		}
 
 		switch (button)
@@ -2338,7 +2353,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			LPFilter(tool_omega_vector, tool_omega, tool_mean_omega_vector, tool_LPF_omega, false);
 
 			updatePose();
-			updateRobotPose(tool_tip_handler);
+			//updateRobotPose(tool_tip_handler);
 			computeGlobalForce();
 			break;
 		case 2:
@@ -2350,7 +2365,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			updateRot();
-			updateRobotPose(tool_tip_handler);
+			//updateRobotPose(tool_tip_handler);
 			break;
 		case 3:
 			if (first_press)
@@ -2372,15 +2387,15 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			}
 			updatePose();
 			updatePosPenetration();
-			updateRobotPose(lwr_target_handler);
-			
-			getContactPoint();
+			//updateRobotPose(lwr_target_handler);
+			manageContact();
 			break;
 		default:
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
-
+			
+			tis.resetRendering();
 
 			global_device_force.setZero();
 		}
@@ -2431,7 +2446,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			device_state.print();
 			cout << "***************************************" << endl;
 			cout << "lwr_tip_handler\t" << lwr_tip_handler << endl;
-			cout << "Skin \t" << tis.getLayerHandler("Skin") << endl;
+			cout << "Skin \t" << tis.getLayerHandler("Skin", true) << endl;
 
 			cout << "Filtered device vel\n" << device_LPF_vel << endl;
 			cout << "Filtered tool vel\n" << tool_LPF_vel << endl;
@@ -2876,58 +2891,54 @@ void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector
 	return;
 }
 
-void getContactPoint(void)
+void manageContact(void)
 {
 	//objects_in_contact contact_point;
 	Vector3fVector contact_points;
-	if (objects_in_contact[1] == tis.getLayerHandler("Skin"))
+	Vector3fVector contact_normals;
+	if (objects_in_contact[1] == tis.getLayerHandler("Skin", true))
 	{
-		cout << "contact_point SKIN\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
-
-		
-		simSetObjectInt32Parameter(tis.getLayerHandler("Skin"), sim_shapeintparam_static, 0);
-		simSetObjectInt32Parameter(tis.getLayerHandler("Skin"), sim_shapeintparam_respondable, 0);
+		contact_normals.push_back(contact_normal);
+		tis.removeDynamicLayer("Skin");
+		tis.toggleTouched("Skin");
 
 		//END
 		objects_in_contact[1] = -1;
 	}
-	else if (objects_in_contact[1] == tis.getLayerHandler("Fat"))
+	else if (objects_in_contact[1] == tis.getLayerHandler("Fat", true))
 	{
-		cout << "contact_point FAT\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
-
-
-		simSetObjectInt32Parameter(tis.getLayerHandler("Fat"), sim_shapeintparam_static, 0);
-		simSetObjectInt32Parameter(tis.getLayerHandler("Fat"), sim_shapeintparam_respondable, 0);
+		contact_normals.push_back(contact_normal);
+		tis.removeDynamicLayer("Fat");
+		tis.toggleTouched("Fat");
 
 		//END
 		objects_in_contact[1] = -1;
 	}
-	else if (objects_in_contact[1] == tis.getLayerHandler("Muscle"))
+	else if (objects_in_contact[1] == tis.getLayerHandler("Muscle", true))
 	{
-		cout << "contact_point MUSCLE\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
-
-		simSetObjectInt32Parameter(tis.getLayerHandler("Muscle"), sim_shapeintparam_static, 0);
-		simSetObjectInt32Parameter(tis.getLayerHandler("Muscle"), sim_shapeintparam_respondable, 0);
+		contact_normals.push_back(contact_normal);
+		tis.removeDynamicLayer("Muscle");
+		tis.toggleTouched("Muscle");
 
 		//END
 		objects_in_contact[1] = -1;
 	}
-	else if (objects_in_contact[1] == tis.getLayerHandler("Bone"))
+	else if (objects_in_contact[1] == tis.getLayerHandler("Bone", true))
 	{
-		cout << "contact_point BONE\n" << contact_point << endl << endl;
 		contact_points.push_back(contact_point);
-
-		simSetObjectInt32Parameter(tis.getLayerHandler("Bone"), sim_shapeintparam_static, 0);
-		simSetObjectInt32Parameter(tis.getLayerHandler("Bone"), sim_shapeintparam_respondable, 0);
+		contact_normals.push_back(contact_normal);
+		tis.removeDynamicLayer("Bone");
+		tis.toggleTouched("Bone");
 
 		//END
 		objects_in_contact[1] = -1;
 	}
 	else
 		return;
+		//tis.printTissue();
 }
 
 void moveFakeDevice(DeviceState& state)
