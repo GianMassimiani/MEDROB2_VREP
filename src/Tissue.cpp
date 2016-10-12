@@ -19,13 +19,14 @@ void Tissue::init(void)
 	simSetObjectName(_dummy_rederer_handler, "Tissue_D");
 	return;
 }
-void Tissue::addLayer(std::string name, float t, float k, float b)
+void Tissue::addLayer(std::string name, float t, float k, float b, Eigen::Vector3f color)
 {
 	Layer temp_l;
 	temp_l._thick			= t;
 	temp_l._name			= name;
 	temp_l._K				= k;
 	temp_l._B				= b;
+	temp_l._color			= color;
 	temp_l._is_perforated	= false;
 	temp_l._touched			= false;
 
@@ -50,7 +51,9 @@ void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float&
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return;
 	}
 
@@ -74,7 +77,9 @@ bool Tissue::checkPerforation(std::string name)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return false;
 	}
 
@@ -99,7 +104,9 @@ bool Tissue::checkTouched(std::string name)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return false;
 	}
 
@@ -138,7 +145,9 @@ void Tissue::togglePerforation(std::string name)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return;
 	}
 	_layers[idx]._is_perforated = !_layers[idx]._is_perforated;
@@ -159,7 +168,9 @@ void Tissue::toggleTouched(std::string name)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return;
 	}
 
@@ -180,7 +191,9 @@ int Tissue::getLayerHandler(std::string name, bool type)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return 0;
 	}
 	if (type)
@@ -194,7 +207,6 @@ void Tissue::renderLayers(void)
 
 	float depth = _center_pos(2);
 	Vector3f curr_cube_pos;
-	Vector3f color_data;
 	float sim_curr_cube_pos[3];
 	float sim_total_cube_pos[3];
 
@@ -210,13 +222,14 @@ void Tissue::renderLayers(void)
 		//! RESPONDABLE AND DYNAMIC CUBES
 		_cube_handlers.push_back(simCreatePureShape(0, 9, tmp, 1.0, NULL)); //HERE
 		simSetObjectName(_cube_handlers[i], _layers[i]._name.c_str());
-		simSetShapeColor(_cube_handlers[i], NULL, sim_colorcomponent_ambient_diffuse, color_data.setRandom().data());
+		simSetShapeColor(_cube_handlers[i], NULL, sim_colorcomponent_ambient_diffuse, _layers[i]._color.data());
 		simSetObjectPosition(_cube_handlers[i], -1, sim_curr_cube_pos);
 
 		//! NON-RESPONDABLE AND STATIC CUBES
 		float transparency[1] = { 0.34f };
 		_static_cube_handlers.push_back(simCreatePureShape(0, 1 + 4 + 16, tmp, 1.0f, NULL));
 		simSetObjectName(_static_cube_handlers[i], (_layers[i]._name + "_static").c_str());
+		simSetShapeColor(_static_cube_handlers[i], NULL, sim_colorcomponent_ambient_diffuse, _layers[i]._color.data());
 		simSetShapeColor(_static_cube_handlers[i], NULL, sim_colorcomponent_transparency, transparency);
 		simSetObjectPosition(_static_cube_handlers[i], -1, sim_curr_cube_pos);
 
@@ -254,13 +267,16 @@ void Tissue::reloadLayer(std::string name)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return;
 	}
 
 	float T[12];
 	float tmp[3] = { _scale[0], _scale[1], _layers[idx]._thick };
 	_layers[idx]._handler = simCreatePureShape(0, 9, tmp, 1.0, NULL);
+	simSetShapeColor(_layers[idx]._handler, NULL, sim_colorcomponent_ambient_diffuse, _layers[idx]._color.data());
 	simGetObjectMatrix(_layers[idx]._static_handler, -1, T);
 	simSetObjectMatrix(_layers[idx]._handler, -1, T);
 	simSetObjectName(_cube_handlers[idx], _layers[idx]._name.c_str());
@@ -278,7 +294,7 @@ float Tissue::getDOP(Eigen::Vector3f start_p,
 	return DOP;
 }
 
-int Tissue::getLayerIDXFromDepth(void)
+int Tissue::getLayerIDXFromTouch(void)
 {
 	if (_layers[0]._touched == false)
 		return -1;
@@ -293,12 +309,31 @@ int Tissue::getLayerIDXFromDepth(void)
 	return -1;
 }
 
+int Tissue::getLayerIDXFromDepth(Eigen::Vector3f start_p,
+	Eigen::Vector3f final_p,
+	Eigen::Vector3f contact_n)
+{
+	float depth = getDOP(start_p, final_p, contact_n);
+	if (depth < 0.0f)
+		return -1;
+	else if (depth >= 0.0f && depth < _layers[0]._thick)
+		return 0;
+	else if (depth >= _layers[0]._thick && depth < _layers[0]._thick + _layers[1]._thick)
+		return 1;
+	else if (depth >= _layers[0]._thick + _layers[1]._thick && depth < _layers[0]._thick + _layers[1]._thick + _layers[2]._thick)
+		return 2;
+	else if (depth >= _layers[0]._thick + _layers[1]._thick + _layers[2]._thick)
+		return 3;
+
+	return -1;
+}
+
 
 void Tissue::restoreLayers(int current_layer_idx)
 {
 	for (int i = current_layer_idx; i < _N; i++)
 	{
-		if (_layers[i]._handler == -1)
+		if (_layers[i]._handler == NULL_HANDLER)
 			reloadLayer(_layers[i]._name);
 	}
 }
@@ -318,12 +353,14 @@ void Tissue::removeDynamicLayer(std::string name)
 	}
 	if (!flag)
 	{
+		red();
 		cerr << "Error, no such tissue layer!" << endl;
+		reset();
 		return;
 	}
 
 	simRemoveObject(_layers[idx]._handler);
-	_layers[idx]._handler = -1;
+	_layers[idx]._handler = NULL_HANDLER;
 }
 
 void Tissue::resetRendering(void)
@@ -335,6 +372,30 @@ void Tissue::resetRendering(void)
 
 		reloadLayer(_layers[i]._name);
 	}
+}
+
+
+void Tissue::setLayerColor(std::string name, Vector3f& color)
+{
+	int idx = -1;
+	bool flag = false;
+	for (int i = 0; i < _N; i++)
+	{
+		if (name == _layers[i]._name)
+		{
+			flag = true;
+			idx = i;
+		}
+	}
+	if (!flag)
+	{
+		red();
+		cerr << "Error, no such tissue layer!" << endl;
+		reset();
+		return;
+	}
+
+	_layers[idx]._color = color;
 }
 /*
 tissue_params[0] <<

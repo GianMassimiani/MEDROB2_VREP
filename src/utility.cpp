@@ -181,3 +181,93 @@ VectorXf deg2radVec(VectorXf a)
 	}
 	return b;
 }
+
+
+// --------------------------------------------------- //
+// ----------------- COLORE CONSOLE ------------------ //
+//  Antonio Cifonelli, tutti i diritti sono riservati. //
+// --------------------------------------------------- //
+
+int red()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int green()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int blue()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int yellow()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int magenta()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int cyan()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int reset()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}

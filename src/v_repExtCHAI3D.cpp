@@ -133,6 +133,7 @@ double LowestStiffness = -1.0;
 // -------------------- Definizioni globali del Device ----------------------//
 // ------------------------------------------------------------------------- //
 // ------------------------------------------------------------------------- //
+typedef std::vector<Eigen::Vector3f> Vector3fVector;
 
 DeviceState device_state;
 #define DEVICE_IDX 0
@@ -185,6 +186,8 @@ int objects_in_contact[2];
 Vector3f contact_point;
 Vector3f contact_force;
 Vector3f contact_normal;
+Vector3fVector contact_points;
+Vector3fVector contact_normals;
 
 // For penetration
 Vector3f tool_tip_init_dir;
@@ -198,7 +201,6 @@ Matrix3f K_m, B_m;
 
 //! Velocity Filtering
 const int buffer_vel_size = 3;
-typedef std::vector<Eigen::Vector3f> Vector3fVector;
 Vector3f device_LPF_vel(0.0, 0.0, 0.0);
 std::vector<Eigen::Vector3f> device_vel_vector (buffer_vel_size);
 std::vector<Eigen::Vector3f> device_mean_vel_vector(buffer_vel_size);
@@ -2145,7 +2147,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
 		{
 			device_found = true;
+			yellow();
 			cout << "Device found. Everithing OK ;)" << endl << endl;
+			reset();
 		}
 		else
 		{ // TODO, a return here
@@ -2216,36 +2220,18 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		eigen2SimTransf(temp, scaled_device_T);
 		simSetObjectMatrix(dummy_handler, -1, scaled_device_T);
 
-		// Set tool pose
-		//float scaled_tool_T[12];
-		//Matrix3f orientation;
-		//orientation = device_state.rot;
-		//orientation.col(0) = device_state.rot.col(2);
-		//orientation.col(2) = -device_state.rot.col(0);
-		//temp.block<3, 3>(0, 0) = orientation;
-		//temp.block<3, 1>(0, 3) = Vector3f(0.6f, 0.0f, 0.6f);
-		//eigen2SimTransf(temp, scaled_tool_T);
-		//simSetObjectMatrix(tool_handler, -1, scaled_tool_T);
-
-		// Set Tool-tip position
-		//float sim_tool_tip_T[12];
-		//float sim_tool_tip_pos[3] = { 0, 0, tool_size[2] / 2 };
-		//simSetObjectPosition(tool_tip_handler, tool_handler, sim_tool_tip_pos);
-		//simGetObjectMatrix(tool_tip_handler, -1, sim_tool_tip_T);
-
 		lwr_target_handler = simGetObjectHandle("LWR_Target");
 
 		// TISSUE INIT
-
 		Vector3f tissue_center;
 		Vector2f tissue_scale;
 		tissue_center << 0.0f, 0.65f, 0.55f;
 		tissue_scale << 0.2f, 0.22f;
 		tis.init();
-		tis.addLayer("Skin",	0.02f,	331.0f,		3.0f);
-		tis.addLayer("Fat",		0.035f,	83.0f,		1.0f);
-		tis.addLayer("Muscle",	0.04f,	497.0f,		3.0f);
-		tis.addLayer("Bone",	0.02f,	2480.0f,	0.0f);
+		tis.addLayer("Skin",	0.02f,	331.0f,		3.0f,	Vector3f(1.0f, 0.76f, 0.51f));
+		tis.addLayer("Fat",		0.035f,	83.0f,		1.0f,	Vector3f(1.0f, 1.0f, 0.51f));
+		tis.addLayer("Muscle",	0.04f,	497.0f,		3.0f,	Vector3f(0.77f, 0.3f, 0.3f));
+		tis.addLayer("Bone",	0.02f,	2480.0f,	0.0f,	Vector3f(1.0f, 1.0f, 0.81f));
 		tis.setTissueCenter(tissue_center);
 		tis.setScale(tissue_scale(0), tissue_scale(1));
 		
@@ -2254,14 +2240,14 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		// Add a plane to substain the tissues
 		float plane_color[3] = { 0.6f, 0.3f, 0.0f };
-		float trasparency[1] = { 0.2f };
+		//float trasparency[1] = { 0.2f };
 		float tissue_depth = tis.getTotalDepth();
 		float plane_size[3] = { tissue_scale(0) * 2.0f, tissue_scale(1) * 2.0f, 0.04f };
 		float plane_pos[3] = { tissue_center(0), tissue_center(1), tissue_center(2) - tissue_depth * 0.5f - plane_size[2] * 0.5f };
 		int plane_handler = simCreatePureShape(0, 1 + 4 + 8 + 16, plane_size, 1.0f, NULL);
 		simSetObjectPosition(plane_handler, -1, plane_pos);
 		simSetShapeColor(plane_handler, NULL, sim_colorcomponent_ambient_diffuse, plane_color);
-		simSetShapeColor(plane_handler, NULL, sim_colorcomponent_transparency, trasparency);
+		//simSetShapeColor(plane_handler, NULL, sim_colorcomponent_transparency, trasparency);
 		simSetObjectName(plane_handler, "Desk");
 
 		// retrieve JOINT HANDLERS
@@ -2269,11 +2255,14 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		for (int i = 1; i < 8; i++)
 		{
 			temp_name = "LBR4p_joint" + std::to_string(i);
+			yellow();
 			cout << temp_name + " initialized" << endl;
+			reset();
 			lwr_joint_handlers.push_back(simGetObjectHandle(temp_name.c_str()));
 		}
-
+		green();
 		cout << "Finish setup" << endl;
+		reset();
 	}
 
 
@@ -2302,8 +2291,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			moveFakeDevice(device_state);
 		}
 
-		int curr_layer_IDX;
-
 		float sim_tool_vel[3];
 		float sim_tool_omega[3];
 		float sim_dummy_T[12];
@@ -2317,19 +2304,41 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		//! Buttons
 		button = chai3DGetButton(DEVICE_IDX);
 
+		//! ATTENZIONE tool_tip -> lwr_tip quando il robot funzionerà
+		float sim_tool_tip_pos[3];
+		Vector3f tool_tip_pos;
+		simGetObjectPosition(tool_tip_handler, -1, sim_tool_tip_pos);
+		sim2EigenVec3f(sim_tool_tip_pos, tool_tip_pos);
+
+
+		// Se sei nel tessuto costringi il bottone ad essere 3;
+		int current_layer_IDX = -1;
+		if (contact_points.size() != 0)
+		{
+			current_layer_IDX = tis.getLayerIDXFromDepth(contact_points[0], tool_tip_pos, contact_normals[0]);
+			if (current_layer_IDX != -1)
+				button = 3;
+		}
+
 		if (prev_button != button && prev_button != 0)
 		{
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
-			tis.resetRendering();
+			// Se sei fuori dal tessuto allora puoi azzerare le cose e il bottone
+			if (prev_button != button && prev_button == 3)
+			{
+				contact_points.clear();
+				tis.resetRendering();
+			}
 		}
-
 		switch (button)
 		{
 		case 1:
 			if (first_press)
 			{
+				contact_points.clear();
+
 				simSetObjectParent(tool_handler, -1, true);
 				simSetObjectParent(tool_tip_handler, tool_handler, true);
 				getOffset();
@@ -2359,6 +2368,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		case 2:
 			if (first_press)
 			{
+				contact_points.clear();
+
 				simSetObjectParent(tool_tip_handler, -1, true);
 				simSetObjectParent(tool_handler, tool_tip_handler, true);
 				getOffset();
@@ -2394,8 +2405,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
-			
-			tis.resetRendering();
+
+			contact_points.clear();
 
 			global_device_force.setZero();
 		}
@@ -2410,49 +2421,37 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				simSetObjectParent(tool_handler, -1, true);
 				simSetObjectParent(tool_tip_handler, tool_handler, true);
 				getOffset();
-				
-				// clear velocity buffers
-				//Vector3f zero_tmp;
-				//zero_tmp.setZero();
-				//LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
-				//LPFilter(tool_vel_vector, zero_tmp, tool_mean_vel_vector, tool_LPF_vel, true);
-				//LPFilter(tool_omega_vector, zero_tmp, tool_mean_omega_vector, tool_LPF_omega, true);
 
 				first_press_fake = false;
 			}
-			//LPFilter(device_vel_vector, device_state.vel, device_mean_vel_vector, device_LPF_vel, false);
-
-			//simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
-			//sim2EigenVec3f(sim_tool_vel, tool_vel);
-			//sim2EigenVec3f(sim_tool_omega, tool_omega);
-
-			//LPFilter(tool_vel_vector, tool_vel, tool_mean_vel_vector, tool_LPF_vel, false);
-			//LPFilter(tool_omega_vector, tool_omega, tool_mean_omega_vector, tool_LPF_omega, false);
-
 			updatePose();
 			computeGlobalForce();
 		}
 
 
 		// COUT
-		want_to_print = false;
+		want_to_print = true;
 
 		if (global_cnt % 100 == 0 && want_to_print)
 		{
+			cyan();
 			cout << endl << "Epoch: \t" << global_cnt << endl;
-			cout << "Button idx: \t" << button << endl;
+			reset();
+			//cout << "Button idx: \t" << button << endl;
+			cout << "tis.getLayerIDXFromDepth()\t" << current_layer_IDX << endl;
+			cout << "contact_points.size()\t" << contact_points.size() << endl;
 
-			cout << "************ Device state *************\n";
-			device_state.print();
-			cout << "***************************************" << endl;
-			cout << "lwr_tip_handler\t" << lwr_tip_handler << endl;
-			cout << "Skin \t" << tis.getLayerHandler("Skin", true) << endl;
+			//cout << "************ Device state *************\n";
+			//device_state.print();
+			//cout << "***************************************" << endl;
+			//cout << "lwr_tip_handler\t" << lwr_tip_handler << endl;
+			//cout << "Skin \t" << tis.getLayerHandler("Skin", true) << endl;
 
-			cout << "Filtered device vel\n" << device_LPF_vel << endl;
-			cout << "Filtered tool vel\n" << tool_LPF_vel << endl;
-			cout << "VEL DIFF\n" << device_LPF_vel - tool_LPF_vel << endl;
+			//cout << "Filtered device vel\n" << device_LPF_vel << endl;
+			//cout << "Filtered tool vel\n" << tool_LPF_vel << endl;
+			//cout << "VEL DIFF\n" << device_LPF_vel - tool_LPF_vel << endl;
 
-			cout << "F_mc\n" << F_mc << endl;
+			//cout << "F_mc\n" << F_mc << endl;
 			//cout << "Cursors[DEVICE_IDX]->Force: \t" << Cursors[DEVICE_IDX]->Force << endl;
 		}
 		global_cnt++;
@@ -2894,8 +2893,6 @@ void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector
 void manageContact(void)
 {
 	//objects_in_contact contact_point;
-	Vector3fVector contact_points;
-	Vector3fVector contact_normals;
 	if (objects_in_contact[1] == tis.getLayerHandler("Skin", true))
 	{
 		contact_points.push_back(contact_point);

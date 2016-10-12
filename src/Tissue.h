@@ -9,17 +9,21 @@
 #include "v_repLib.h"
 #include "utility.h"
 
+#define NULL_HANDLER -1000
+
 struct Layer
 {
 	std::string _name;
-	float	_thick;
-	float	_K;
-	float	_B;
-	bool	_is_perforated;
-	bool	_touched;
+	float		_thick;
+	float		_K;
+	float		_B;
+	bool		_is_perforated;
+	bool		_touched;
 
-	int		_handler;
-	int		_static_handler;
+	int			_handler;
+	int			_static_handler;
+
+	Vector3f	_color;
 };
 
 class Tissue
@@ -30,7 +34,7 @@ public:
 	~Tissue();
 
 	void init(void);
-	void addLayer(std::string name, float t, float k, float b);
+	void addLayer(std::string name, float t, float k, float b, Eigen::Vector3f color);
 	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b);
 	bool checkPerforation(std::string name);
 	void togglePerforation(std::string name);
@@ -46,13 +50,17 @@ public:
 	float getDOP(Eigen::Vector3f start_p,
 		Eigen::Vector3f final_p,
 		Eigen::Vector3f contact_n);
-	int getLayerIDXFromDepth(void);
+	int getLayerIDXFromTouch(void);
+	int Tissue::getLayerIDXFromDepth(Eigen::Vector3f start_p,
+		Eigen::Vector3f final_p,
+		Eigen::Vector3f contact_n);
 
 	inline void setTissueCenter(Eigen::Vector3f c) { _center_pos = c; };
 	inline void setScale(float h, float w) { _scale[0] = h; _scale[1] = w; };
 	inline float getTotalDepth(void) { return _d; };
 
 	void printTissue(void);
+	void setLayerColor(std::string name, Vector3f& color);
 
 private:
 	Eigen::Vector3f _center_pos;

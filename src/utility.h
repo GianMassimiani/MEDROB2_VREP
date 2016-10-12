@@ -8,10 +8,20 @@
 //! TUTTE TESTATE.
 #pragma once
 
+#include <Windows.h>
+
 #include <iostream>
 #include <algorithm>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+
+#include <fstream>
+#include <iostream>
+#include <math.h>
+#include <sstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
 
 #include "luaFunctionData.h"
 #include "v_repLib.h"
@@ -28,6 +38,17 @@ typedef Eigen::Matrix<float, 7, 7> Matrix7f;
 
 using namespace std;
 using namespace Eigen;
+
+
+int red();
+int green();
+int blue();
+int yellow();
+int magenta();
+int cyan();
+int reset();
+
+
 
 // This function prints a float[12] array, in matrix style.
 // TODO: fix last print
