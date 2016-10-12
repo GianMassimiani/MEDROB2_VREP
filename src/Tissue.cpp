@@ -27,6 +27,7 @@ void Tissue::addLayer(std::string name, float t, float k, float b, Eigen::Vector
 	temp_l._K				= k;
 	temp_l._B				= b;
 	temp_l._color			= color;
+	temp_l._max_force		= t * 0.5f * k; //! Is this true?
 	temp_l._is_perforated	= false;
 	temp_l._touched			= false;
 
@@ -61,6 +62,53 @@ void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float&
 	out_k = _layers[idx]._K;
 	out_b = _layers[idx]._B;
 }
+
+
+void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float& out_b, float& out_fMax)
+{
+	//! WILL THIS WORK?
+	int idx = -1;
+	bool flag = false;
+	for (int i = 0; i < _N; i++)
+	{
+		if (name == _layers[i]._name)
+		{
+			flag = true;
+			idx = i;
+		}
+	}
+	if (!flag)
+	{
+		red();
+		cerr << "Error, no such tissue layer!" << endl;
+		reset();
+		return;
+	}
+
+	out_t = _layers[idx]._thick;
+	out_k = _layers[idx]._K;
+	out_b = _layers[idx]._B;
+	out_fMax = _layers[idx]._max_force;
+}
+
+void Tissue::getAllLayerParam(Eigen::VectorXf& out_t_vec, Eigen::VectorXf& out_k_vec, Eigen::VectorXf& out_b_vec, Eigen::VectorXf& out_fMax_vec)
+{
+	out_t_vec.resize(_N);
+	out_k_vec.resize(_N);
+	out_b_vec.resize(_N);
+	out_fMax_vec.resize(_N);
+
+	for (int i = 0; i < _N; i++)
+	{
+		out_t_vec(i) = _layers[i]._thick;
+		out_k_vec(i) = _layers[i]._K;
+		out_b_vec(i) = _layers[i]._B;
+		out_fMax_vec(i) = _layers[i]._max_force;
+	}
+}
+
+
+
 
 bool Tissue::checkPerforation(std::string name)
 {
@@ -281,6 +329,9 @@ void Tissue::reloadLayer(std::string name)
 	simSetObjectMatrix(_layers[idx]._handler, -1, T);
 	simSetObjectName(_cube_handlers[idx], _layers[idx]._name.c_str());
 	simSetObjectParent(_layers[idx]._handler, _layers[idx]._static_handler, true);
+
+	_layers[idx]._is_perforated = false;
+	_layers[idx]._touched = false;
 }
 
 

@@ -2155,8 +2155,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		{ // TODO, a return here
 			device_found = false;
 			first_press_fake = true;
+			red();
 			cerr << endl << "***************WARNING****************"
 				<< endl << "******** Device not found! :( ********" << endl << endl;
+			reset();
 		}
 
 		// NOTE: the reference frames of the real haptic device and of the virtual 
@@ -2469,8 +2471,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	if (message == sim_message_eventcallback_simulationended)
 	{
 		hapticReset();
+		red();
 		cout << "*********************************" << endl;
 		cout << "Sim stopped, device disconnected" << endl;
+		reset();
 	}
 	return retVal;
 }
@@ -2840,53 +2844,96 @@ void checkValues(int init_val, int fin_val, float* param, float default_value)
 
 }
 
+//! RICORDA CHE DEVI USARE LWR TIP PER POSIZIONE E VELOCITA'
 // Forces on the dummy (PENETRATION)
-void computeExternalForce(Vector3f& ext_F, Vector3f& _tool_tip_pos, const Vector3f& _contact_pos)
+void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos, 
+	const Vector3fVector& contact_pos_vector, 
+	const Vector3f& contact_N,
+	const Vector3f& LWR_tip_velocity)
 {
-	float DOP_local;
-	float DOP = abs(_contact_pos.z() - _tool_tip_pos.z());
-	float total_penetration = (_tool_tip_pos - _contact_pos).norm(); // total penetration
-	float local_penetration; // in each tissue
+	//! Force direction
+	Vector3f F_dir;
+	Matrix4f dummy_T;
 
-	if (DOP >= tissue_params[0](0) && DOP < tissue_params[1](0))
+	float sim_dummy_T[12];
+
+	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
+	sim2EigenTransf(sim_dummy_T, dummy_T);
+
+	F_dir = dummy_T.block<3, 1>(0, 2);
+
+	//! Force magnitude
+	VectorXf K;
+	VectorXf B;
+	VectorXf F_max;
+	VectorXf thick;
+
+	float needle_penetration;
+	float F_magnitude;
+	int current_layer_IDX = tis.getLayerIDXFromDepth(contact_pos_vector[0], LWR_tip_pos, contact_N);
+
+	tis.getAllLayerParam(thick, K, B, F_max);
+	switch (current_layer_IDX)
 	{
-		local_penetration = total_penetration;
-	}
-	else if (DOP >= tissue_params[1](0) && DOP < tissue_params[2](0))
-	{
-		DOP_local = DOP - tissue_params[0](0);
-		local_penetration = (DOP_local / DOP) * total_penetration;
-	}
-	else if (DOP >= tissue_params[2](0) && DOP < tissue_params[3](0))
-	{
-		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0));
-		local_penetration = (DOP_local / DOP) * total_penetration;
-	}
-	else if (DOP >= tissue_params[3](0))
-	{
-		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0) + tissue_params[2](0));
-		local_penetration = (DOP_local / DOP) * total_penetration;
+	// If the needle is in the skin
+	case 0:
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		if (!tis.checkPerforation("Skin"))
+		{
+			F_magnitude = K(0) * needle_penetration;
+
+			if (F_magnitude > F_max(0))
+				tis.togglePerforation("Skin");
+		}
+		if (tis.checkPerforation("Skin"))
+			F_magnitude = B(0) * needle_penetration * LWR_tip_velocity.norm();
+		break;
+
+	// If the needle is in the fat
+	case 1:
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		if (!tis.checkPerforation("Fat"))
+		{
+			F_magnitude = K(1) * needle_penetration + 
+				B(0) * thick(0) * LWR_tip_velocity.norm();
+
+			if (F_magnitude > F_max(1))
+				tis.togglePerforation("Fat");
+		}
+		if (tis.checkPerforation("Fat"))
+			F_magnitude = (B(0) * thick(0) + B(1) * needle_penetration) * LWR_tip_velocity.norm();
+		break;
+
+	// If the needle is in the fat
+	case 2:
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		if (!tis.checkPerforation("Muscle"))
+		{
+			F_magnitude = K(2) * needle_penetration +
+				(B(0) * thick(0) + B(1) * thick(1)) * LWR_tip_velocity.norm();
+
+			if (F_magnitude > F_max(1))
+				tis.togglePerforation("Muscle");
+		}
+		if (tis.checkPerforation("Muscle"))
+			F_magnitude = (B(0) * thick(0) + B(1) * thick(1) + B(2) * needle_penetration) * LWR_tip_velocity.norm();
+		break;
+
+		// If the needle is in the bone
+	case 3:
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		if (!tis.checkPerforation("Bone"))
+		{
+			F_magnitude = K(3) * needle_penetration +
+				(B(0) * thick(0) + B(1) * thick(1) + B(2) * thick(2)) * LWR_tip_velocity.norm();
+		}
+		break;
+
+	default:
+		break;
 	}
 
-
-	if (DOP >= tissue_params[0](0) && DOP < tissue_params[1](0))
-		local_penetration = total_penetration;
-	else if (DOP >= tissue_params[1](0) && DOP < tissue_params[2](0))
-	{
-		DOP_local = DOP - tissue_params[0](0);
-		local_penetration = (DOP_local / DOP) * total_penetration;
-	}
-	else if (DOP >= tissue_params[2](0) && DOP < tissue_params[3](0))
-	{
-		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0));
-		local_penetration = (DOP_local / DOP) * total_penetration;
-	}
-	else if (DOP >= tissue_params[3](0))
-	{
-		DOP_local = DOP - (tissue_params[0](0) + tissue_params[1](0) + tissue_params[2](0));
-		local_penetration = (DOP_local / DOP) * total_penetration;
-	}
-
+	ext_F = F_magnitude * F_dir;
 	return;
 }
 

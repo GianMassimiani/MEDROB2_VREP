@@ -23,6 +23,8 @@ struct Layer
 	int			_handler;
 	int			_static_handler;
 
+	float		_max_force;
+
 	Vector3f	_color;
 };
 
@@ -35,7 +37,9 @@ public:
 
 	void init(void);
 	void addLayer(std::string name, float t, float k, float b, Eigen::Vector3f color);
+	void getAllLayerParam(Eigen::VectorXf& out_t_vec, Eigen::VectorXf& out_k_vec, Eigen::VectorXf& out_b_vec, Eigen::VectorXf& out_fMax_vec);
 	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b);
+	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b, float& out_fMax);
 	bool checkPerforation(std::string name);
 	void togglePerforation(std::string name);
 	bool checkTouched(std::string name);
