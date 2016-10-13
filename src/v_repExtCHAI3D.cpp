@@ -156,6 +156,7 @@ simInt force_displ_graph_handler;
 simInt force_graph_handler;
 simInt ext_force_graph_handler;
 simInt UI_handler;
+simInt LayersUI_handler;
 std::vector<simInt> lwr_joint_handlers;
 simInt aux_val[2] = { NULL, NULL };
 simInt button_handler;
@@ -198,6 +199,11 @@ Matrix4f dummy_T;
 // UI parameters
 int controller_ID = 1;
 Matrix3f K_m, B_m;
+Vector4f UI_thick_vec, UI_K_vec, UI_B_vec, UI_p_t_p_vec;
+std::vector<std::string> UI_layers_names = { "Skin", "Fat", "Muscle", "Bone"};
+int UI_layer_idx = 0;
+bool use_default_tissue_values = false;
+
 
 //! Velocity Filtering
 const int buffer_vel_size = 3;
@@ -255,11 +261,15 @@ void LPFilter(Vector3fVector& v_vector,
 
 // UI Functions
 void readUI(void);
-void checkAndSetValues(int ID);
+void readLayersUI(void);
+void checkAndSetValues(int ID, int UI_handler);
 void checkValues(int init_val, 
 	int fin_val, 
 	float* param, 
-	float default_value);
+	float default_value,
+	int UI_handler);
+void loadLayerParams(int layer_idx);
+void readLayerParams(int layer_idx, float* tmp, int UI_handler);
 
 // fake movement functions declarations
 void moveFakeDevice(DeviceState& state);
@@ -2134,6 +2144,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	simSetIntegerParameter(sim_intparam_error_report_mode, errorModeSaved);
 
 	readUI();
+	readLayersUI();
 
 
 	// ------------------------------------------------------------------------- //
@@ -2231,10 +2242,34 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		tissue_center << 0.0f, 0.65f, 0.65f;
 		tissue_scale << 0.2f, 0.22f;
 		tis.init();
-		tis.addLayer("Skin",	0.12f,	331.0f	/ 100.0f,		3.0f / 100.0f,	0.7f,	Vector3f(1.0f, 0.76f, 0.51f));
-		tis.addLayer("Fat",		0.135f,	83.0f	/ 100.0f,		1.0f / 100.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
-		tis.addLayer("Muscle",	0.14f,	497.0f	/ 100.0f,		3.0f / 100.0f,	0.2f,	Vector3f(0.77f, 0.3f, 0.3f));
-		tis.addLayer("Bone",	0.12f,	2480.0f	/ 100.0f,		0.0f / 100.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
+
+		Vector3fVector colors;
+		colors = { Vector3f(1.0f, 0.76f, 0.51f),
+			Vector3f(1.0f, 1.0f, 0.51f),
+			Vector3f(0.77f, 0.3f, 0.3f),
+			Vector3f(1.0f, 1.0f, 0.81f) };
+
+
+
+		if (use_default_tissue_values)
+		{
+			tis.addLayer("Skin",	0.12f,	331.0f	/ 100.0f,		3.0f * 10.0f,	0.7f,	Vector3f(1.0f, 0.76f, 0.51f));
+			tis.addLayer("Fat",		0.135f,	83.0f	/ 100.0f,		1.0f * 10.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
+			tis.addLayer("Muscle",	0.14f,	497.0f	/ 100.0f,		3.0f * 10.0f,	0.2f,	Vector3f(0.77f, 0.3f, 0.3f));
+			tis.addLayer("Bone",	0.12f,	2480.0f	/ 100.0f,		0.0f * 10.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
+		}
+		else
+		{
+			for (unsigned int i = 0; i < UI_layers_names.size(); i++)
+				tis.addLayer(UI_layers_names[i],
+					UI_thick_vec(i) * 1000.0f,
+					UI_K_vec(i) / 100.0f,
+					UI_B_vec(i) * 10.0f,
+					UI_p_t_p_vec(i),
+					colors[i]);
+		}
+
+
 		tis.setTissueCenter(tissue_center);
 		tis.setScale(tissue_scale(0), tissue_scale(1));
 		
@@ -2333,6 +2368,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			{
 				contact_points.clear();
 				tis.resetRendering();
+				simResetGraph(force_displ_graph_handler);
 			}
 		}
 		switch (button)
@@ -2424,7 +2460,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			updatePosPenetration();
 			//updateRobotPose(lwr_target_handler);
 			manageContact();
-
+			tool_tip_external_F.setZero();
 			if (contact_points.size() > 0)
 				computeExternalForce(tool_tip_external_F, tool_tip_pos, contact_points, contact_normals[0], tool_tip_LPF_vel); //! QUI
 			computeGlobalForce();
@@ -2768,7 +2804,7 @@ void readUI(void)
 			simStopSimulation();
 
 		cout << "Check Values" << endl;
-		checkAndSetValues(controller_ID);
+		checkAndSetValues(controller_ID, UI_handler);
 		simStartSimulation();
 		break;
 	default:
@@ -2776,7 +2812,68 @@ void readUI(void)
 	}
 }
 
-void checkAndSetValues(int ID)
+
+void readLayersUI(void)
+{
+
+	int size = UI_layers_names.size();
+	LayersUI_handler = simGetUIHandle("UI0");
+	button_handler = simGetUIEventButton(LayersUI_handler, aux_val);
+
+	float tmp[4] = {0.0f,0.0f,0.0f,0.0f};
+	
+	switch (button_handler)
+	{
+	case 14: 
+		use_default_tissue_values = true;
+		break;
+	case 8:
+		readLayerParams(UI_layer_idx, tmp, LayersUI_handler);
+		UI_layer_idx = (UI_layer_idx + size -1) % size;
+		yellow();
+		cout << UI_layer_idx << endl;
+		reset();
+		loadLayerParams(UI_layer_idx);
+		break;
+	case 9:
+		cout << "pre read" << endl;
+		readLayerParams(UI_layer_idx, tmp, LayersUI_handler);
+		UI_layer_idx = (UI_layer_idx + 1) % size;
+		yellow();
+		cout << UI_layer_idx << endl;
+		reset();
+		loadLayerParams(UI_layer_idx);
+		break;
+	default:
+		break;
+	}
+
+
+}
+
+void loadLayerParams(int layer_idx)
+{
+	simSetUIButtonLabel(LayersUI_handler, 3, UI_layers_names[layer_idx].c_str(), NULL);
+	simSetUIButtonLabel(LayersUI_handler, 10, std::to_string(UI_thick_vec(layer_idx)).c_str(), NULL);
+	simSetUIButtonLabel(LayersUI_handler, 11, std::to_string(UI_K_vec(layer_idx)).c_str(), NULL);
+	simSetUIButtonLabel(LayersUI_handler, 12, std::to_string(UI_B_vec(layer_idx)).c_str(), NULL);
+	simSetUIButtonLabel(LayersUI_handler, 13, std::to_string(UI_p_t_p_vec(layer_idx)).c_str(), NULL);
+}
+
+void readLayerParams(int layer_idx, float* tmp, int UI_handler)
+{
+	checkValues(10, 13, tmp, 0.50, UI_handler);
+	green();
+	cout << "check done" << endl;
+	UI_thick_vec(layer_idx) = tmp[0];
+	UI_K_vec(layer_idx) = tmp[1];
+	UI_B_vec(layer_idx) = tmp[2];
+	UI_p_t_p_vec(layer_idx) = tmp[3];
+
+	reset();
+}
+
+void checkAndSetValues(int ID, int UI_handler)
 {
 	float tmp[3];
 	K_m.setIdentity();
@@ -2784,31 +2881,31 @@ void checkAndSetValues(int ID)
 
 	if (ID == 1)
 	{
-		checkValues(6, 8, tmp, 1.0);
+		checkValues(6, 8, tmp, 1.0, UI_handler);
 		K_m(0, 0) = tmp[0];
 		K_m(1, 1) = tmp[1];
 		K_m(2, 2) = tmp[2];
 
-		checkValues(9, 11, tmp, 1.0);
+		checkValues(9, 11, tmp, 1.0, UI_handler);
 		B_m(0, 0) = tmp[0];
 		B_m(1, 1) = tmp[1];
 		B_m(2, 2) = tmp[2];
 	}
 	else if (ID == 2)
 	{
-		checkValues(15, 17, tmp, 1.0);
+		checkValues(15, 17, tmp, 1.0, UI_handler);
 		K_m(0, 0) = tmp[0];
 		K_m(1, 1) = tmp[1];
 		K_m(2, 2) = tmp[2];
 
-		checkValues(18, 20, tmp, 1.0);
+		checkValues(18, 20, tmp, 1.0, UI_handler);
 		B_m(0, 0) = tmp[0];
 		B_m(1, 1) = tmp[1];
 		B_m(2, 2) = tmp[2];
 	}
 	else if (ID == 3)
 	{
-		checkValues(24, 26, tmp, 1.0);
+		checkValues(24, 26, tmp, 1.0, UI_handler);
 		K_m(0, 0) = tmp[0];
 		K_m(1, 1) = tmp[1];
 		K_m(2, 2) = tmp[2];
@@ -2816,7 +2913,7 @@ void checkAndSetValues(int ID)
 	simSetUIButtonLabel(UI_handler, 27, current_controller, NULL);
 }
 
-void checkValues(int init_val, int fin_val, float* param, float default_value) 
+void checkValues(int init_val, int fin_val, float* param, float default_value, int UI_handler) 
 {
 	simChar* label;
 
@@ -2870,7 +2967,7 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 	VectorXf thick;
 
 	float needle_penetration;
-	float F_magnitude;
+	float F_magnitude = 0.0f;
 	float DOP = tis.getDOP(contact_pos_vector[0], LWR_tip_pos, contact_N);
 	int current_layer_IDX = tis.getLayerIDXFromDepth(contact_pos_vector[0], LWR_tip_pos, contact_N);
 
