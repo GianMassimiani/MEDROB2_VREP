@@ -152,9 +152,9 @@ simInt tool_tip_handler;
 simInt lwr_target_handler;
 simInt lwr_tip_handler;
 simFloat resolution = 5.0;
-simInt vel_graph_handler;
+simInt force_displ_graph_handler;
 simInt force_graph_handler;
-simInt test_graph_handler;
+simInt ext_force_graph_handler;
 simInt UI_handler;
 std::vector<simInt> lwr_joint_handlers;
 simInt aux_val[2] = { NULL, NULL };
@@ -167,7 +167,7 @@ bool first_press = true;
 int global_cnt = 0;
 
 Vector3d global_device_force(0.0, 0.0, 0.0);
-Vector3f tool_external_F(0.0, 0.0, 0.0);
+Vector3f tool_tip_external_F(0.0, 0.0, 0.0);
 std::vector<Eigen::Vector3f> tissue_params;
 
 Matrix4f offset_transform;
@@ -201,17 +201,17 @@ Matrix3f K_m, B_m;
 
 //! Velocity Filtering
 const int buffer_vel_size = 3;
-Vector3f device_LPF_vel(0.0, 0.0, 0.0);
+Vector3f device_LPF_vel(0.0, 0.0, 0.0); //! ATTENZIONE questo deve essere tool_tip
 std::vector<Eigen::Vector3f> device_vel_vector (buffer_vel_size);
 std::vector<Eigen::Vector3f> device_mean_vel_vector(buffer_vel_size);
 
-Vector3f tool_LPF_vel(0.0, 0.0, 0.0);
-std::vector<Eigen::Vector3f> tool_vel_vector(buffer_vel_size);
-std::vector<Eigen::Vector3f> tool_mean_vel_vector(buffer_vel_size);
+Vector3f tool_tip_LPF_vel(0.0, 0.0, 0.0); //! ATTENZIONE questo deve essere lwr_tip
+std::vector<Eigen::Vector3f> tool_tip_vel_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> tool_tip_mean_vel_vector(buffer_vel_size);
 
-Vector3f tool_LPF_omega(0.0, 0.0, 0.0);
-std::vector<Eigen::Vector3f> tool_omega_vector(buffer_vel_size);
-std::vector<Eigen::Vector3f> tool_mean_omega_vector(buffer_vel_size);
+Vector3f tool_tip_LPF_omega(0.0, 0.0, 0.0); //! ATTENZIONE questo deve essere lwr_tip
+std::vector<Eigen::Vector3f> tool_tip_omega_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> tool_tip_mean_omega_vector(buffer_vel_size);
 
 float time_step;
 
@@ -237,9 +237,10 @@ void manageContact(void);
 
 // Force functions
 void computeGlobalForce(void);
-void computeExternalForce(Vector3f& ext_F, 
-	Vector3f& _tool_tip_pos, 
-	const Vector3f& _contact_pos);
+void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
+	const Vector3fVector& contact_pos_vector,
+	const Vector3f& contact_N,
+	const Vector3f& LWR_tip_velocity);
 
 // Filtering
 void filterVelocity(Vector3fVector& v_vector, 
@@ -2147,7 +2148,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
 		{
 			device_found = true;
-			yellow();
+			green();
 			cout << "Device found. Everithing OK ;)" << endl << endl;
 			reset();
 		}
@@ -2190,9 +2191,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		lwr_tip_handler = simGetObjectHandle("LWR_tip");
 		
 		// Graph
-		vel_graph_handler = simGetObjectHandle("Vel_graph");
-		force_graph_handler = simGetObjectHandle("Force_graph");
-		test_graph_handler = simGetObjectHandle("Test_graph");
+		force_displ_graph_handler = simGetObjectHandle("Force_displ_graph");
+		force_graph_handler		= simGetObjectHandle("Force_graph");
+		ext_force_graph_handler = simGetObjectHandle("Ext_force_graph");
 
 		// INITIALIZE THE DEVICE
 		if (device_found)
@@ -2227,13 +2228,13 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// TISSUE INIT
 		Vector3f tissue_center;
 		Vector2f tissue_scale;
-		tissue_center << 0.0f, 0.65f, 0.55f;
+		tissue_center << 0.0f, 0.65f, 0.65f;
 		tissue_scale << 0.2f, 0.22f;
 		tis.init();
-		tis.addLayer("Skin",	0.02f,	331.0f,		3.0f,	Vector3f(1.0f, 0.76f, 0.51f));
-		tis.addLayer("Fat",		0.035f,	83.0f,		1.0f,	Vector3f(1.0f, 1.0f, 0.51f));
-		tis.addLayer("Muscle",	0.04f,	497.0f,		3.0f,	Vector3f(0.77f, 0.3f, 0.3f));
-		tis.addLayer("Bone",	0.02f,	2480.0f,	0.0f,	Vector3f(1.0f, 1.0f, 0.81f));
+		tis.addLayer("Skin",	0.12f,	331.0f	/ 100.0f,		3.0f / 100.0f,	0.7f,	Vector3f(1.0f, 0.76f, 0.51f));
+		tis.addLayer("Fat",		0.135f,	83.0f	/ 100.0f,		1.0f / 100.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
+		tis.addLayer("Muscle",	0.14f,	497.0f	/ 100.0f,		3.0f / 100.0f,	0.2f,	Vector3f(0.77f, 0.3f, 0.3f));
+		tis.addLayer("Bone",	0.12f,	2480.0f	/ 100.0f,		0.0f / 100.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
 		tis.setTissueCenter(tissue_center);
 		tis.setScale(tissue_scale(0), tissue_scale(1));
 		
@@ -2345,12 +2346,13 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				simSetObjectParent(tool_tip_handler, tool_handler, true);
 				getOffset();
 
+				//! ATTENZIONE ci deve essere lwr_tip al posto di tool_tip
 				// clear velocity buffers
 				Vector3f zero_tmp;
 				zero_tmp.setZero();
 				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
-				LPFilter(tool_vel_vector, zero_tmp, tool_mean_vel_vector, tool_LPF_vel, true);
-				LPFilter(tool_omega_vector, zero_tmp, tool_mean_omega_vector, tool_LPF_omega, true);
+				LPFilter(tool_tip_vel_vector, zero_tmp, tool_tip_mean_vel_vector, tool_tip_LPF_vel, true);
+				LPFilter(tool_tip_omega_vector, zero_tmp, tool_tip_mean_omega_vector, tool_tip_LPF_omega, true);
 
 				first_press = false;
 			}
@@ -2360,8 +2362,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			sim2EigenVec3f(sim_tool_vel, tool_vel);
 			sim2EigenVec3f(sim_tool_omega, tool_omega);
 
-			LPFilter(tool_vel_vector, tool_vel, tool_mean_vel_vector, tool_LPF_vel, false);
-			LPFilter(tool_omega_vector, tool_omega, tool_mean_omega_vector, tool_LPF_omega, false);
+			LPFilter(tool_tip_vel_vector, tool_vel, tool_tip_mean_vel_vector, tool_tip_LPF_vel, false);
+			LPFilter(tool_tip_omega_vector, tool_omega, tool_tip_mean_omega_vector, tool_tip_LPF_omega, false);
 
 			updatePose();
 			//updateRobotPose(tool_tip_handler);
@@ -2395,13 +2397,37 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				tool_tip_init_dir = tool_tip_T.block<3, 1>(0, 2);
 				tool_tip_init_pos = tool_tip_T.block<3, 1>(0, 3);
 
+				//! Velocity filtering: clear velocity buffers
+				//! ATTENZIONE ci deve essere lwr_tip al posto di tool_tip
+				Vector3f zero_tmp;
+				zero_tmp.setZero();
+				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
+				LPFilter(tool_tip_vel_vector, zero_tmp, tool_tip_mean_vel_vector, tool_tip_LPF_vel, true);
+				LPFilter(tool_tip_omega_vector, zero_tmp, tool_tip_mean_omega_vector, tool_tip_LPF_omega, true);
+
 				getOffset();
 				first_press = false;
 			}
+
+			//! Velocity filtering
+			//! ATTENZIONE ci deve essere lwr_tip al posto di tool_tip
+			LPFilter(device_vel_vector, device_state.vel, device_mean_vel_vector, device_LPF_vel, false);
+
+			simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
+			sim2EigenVec3f(sim_tool_vel, tool_vel);
+			sim2EigenVec3f(sim_tool_omega, tool_omega);
+
+			LPFilter(tool_tip_vel_vector, tool_vel, tool_tip_mean_vel_vector, tool_tip_LPF_vel, false);
+			LPFilter(tool_tip_omega_vector, tool_omega, tool_tip_mean_omega_vector, tool_tip_LPF_omega, false);
+
 			updatePose();
 			updatePosPenetration();
 			//updateRobotPose(lwr_target_handler);
 			manageContact();
+
+			if (contact_points.size() > 0)
+				computeExternalForce(tool_tip_external_F, tool_tip_pos, contact_points, contact_normals[0], tool_tip_LPF_vel); //! QUI
+			computeGlobalForce();
 			break;
 		default:
 			first_press = true;
@@ -2438,10 +2464,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		{
 			cyan();
 			cout << endl << "Epoch: \t" << global_cnt << endl;
+			cout << "Button idx: \t" << button << endl;
 			reset();
-			//cout << "Button idx: \t" << button << endl;
-			cout << "tis.getLayerIDXFromDepth()\t" << current_layer_IDX << endl;
-			cout << "contact_points.size()\t" << contact_points.size() << endl;
 
 			//cout << "************ Device state *************\n";
 			//device_state.print();
@@ -2603,24 +2627,14 @@ void computeGlobalForce(void)
 	sim2EigenTransf(sim_dummy_T, dummy_T);
 	dummy_R = dummy_T.block<3, 3>(0, 0);
 
-	tool_tip_F = dummy_R.col(0); // forza lungo l'asse x del dummy (sempre)
-
-	//temp_v = tool_tip_F.cast<double>();
-
-	//Matrix3f K_inertia;
-	//K_inertia.setIdentity();
-	//K_inertia << 1.0, 0, 0,
-	//	0, 1.0, 0,
-	//	0, 0, 1.0;
-	//F_mc = K_inertia * (device_state.vel - tool_vel);
-	
+	tool_tip_F = dummy_R.col(0); // forza lungo l'asse x del dummy (sempre)	
 	
 	switch (controller_ID)
 	{
 	case 1:
 		// Pos/Force-Pos (Non-uniform matrix port)
-		//F_mc = (K_m * tool_external_F) + (B_m * (device_state.vel - tool_vel));
-		F_mc = (K_m * tool_external_F) + (B_m * (device_LPF_vel - tool_LPF_vel));
+		//F_mc = (K_m * tool_tip_external_F) + (B_m * (device_state.vel - tool_vel));
+		F_mc = (K_m * tool_tip_external_F) + (B_m * (device_LPF_vel - tool_tip_LPF_vel));
 		break;
 	case 2:
 		// Pos / Pos
@@ -2631,7 +2645,7 @@ void computeGlobalForce(void)
 		break;
 	case 3:
 		// Pos / Force
-		F_mc = K_m * tool_external_F;
+		F_mc = K_m * tool_tip_external_F;
 		break;
 	default:
 		// Null force (just in case)
@@ -2656,10 +2670,7 @@ void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_
 	{
 		for (int i = 0; i < buffer_vel_size; i++)
 			v_vector[i] = new_vel;
-
-		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
 		mean_vel = new_vel;
-		simSetGraphUserData(vel_graph_handler, "Filtered_vel", mean_vel.norm());
 	}
 	else
 	{
@@ -2668,15 +2679,10 @@ void filterVelocity(Vector3fVector& v_vector, Vector3f& new_vel, Vector3f& mean_
 
 		v_vector[0] = new_vel;
 
-		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
-
 		mean_vel.setZero();
 		for (int j = 0; j < buffer_vel_size; j++)
 			mean_vel += v_vector[j];
 		mean_vel = mean_vel / (const float)buffer_vel_size;
-
-
-		simSetGraphUserData(vel_graph_handler, "Filtered_vel", mean_vel.norm());
 	}
 }
 
@@ -2687,7 +2693,9 @@ void LPFilter(Vector3fVector& v_vector, Vector3f& new_vel, Vector3fVector& mean_
 	{
 		if (v_vector.size() != mean_vel_vector.size())
 		{
+			red();
 			cerr << "Error, different vectors size" << endl;
+			reset();
 			return;
 		}
 
@@ -2698,14 +2706,9 @@ void LPFilter(Vector3fVector& v_vector, Vector3f& new_vel, Vector3fVector& mean_
 			mean_vel_vector[i] = new_vel;
 
 		LPF_vel.setZero();
-
-		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
-		simSetGraphUserData(vel_graph_handler, "Filtered_vel", LPF_vel.norm());
 	}
 	else
 	{
-		simSetGraphUserData(vel_graph_handler, "Vel", new_vel.norm());
-
 		//! Il filtraggio potrebbe dover essere fatto nell'haptic loop 
 		//! poiché originariamente richiede una frequenza di aggiornamento di 1000Hz;
 		float update_freq = 1000.0f;
@@ -2730,8 +2733,6 @@ void LPFilter(Vector3fVector& v_vector, Vector3f& new_vel, Vector3fVector& mean_
 
 		// LPF
 		LPF_vel = LPF_vel + (mean_vel_vector[0] - LPF_vel)*alpha;
-		
-		simSetGraphUserData(vel_graph_handler, "Filtered_vel", LPF_vel.norm());
 	}
 }
 
@@ -2860,19 +2861,20 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 	simGetObjectMatrix(dummy_handler, -1, sim_dummy_T);
 	sim2EigenTransf(sim_dummy_T, dummy_T);
 
-	F_dir = dummy_T.block<3, 1>(0, 2);
+	F_dir = dummy_T.block<3, 1>(0, 0);
 
 	//! Force magnitude
 	VectorXf K;
 	VectorXf B;
-	VectorXf F_max;
+	VectorXf p_thick;
 	VectorXf thick;
 
 	float needle_penetration;
 	float F_magnitude;
+	float DOP = tis.getDOP(contact_pos_vector[0], LWR_tip_pos, contact_N);
 	int current_layer_IDX = tis.getLayerIDXFromDepth(contact_pos_vector[0], LWR_tip_pos, contact_N);
 
-	tis.getAllLayerParam(thick, K, B, F_max);
+	tis.getAllLayerParam(thick, K, B, p_thick);
 	switch (current_layer_IDX)
 	{
 	// If the needle is in the skin
@@ -2882,8 +2884,13 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 		{
 			F_magnitude = K(0) * needle_penetration;
 
-			if (F_magnitude > F_max(0))
+			if (DOP > p_thick[0])
+			{
 				tis.togglePerforation("Skin");
+				red();
+				cout << "PERFORATED SKIN" << endl;
+				reset();
+			}
 		}
 		if (tis.checkPerforation("Skin"))
 			F_magnitude = B(0) * needle_penetration * LWR_tip_velocity.norm();
@@ -2891,14 +2898,19 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 
 	// If the needle is in the fat
 	case 1:
-		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[1]).norm();
 		if (!tis.checkPerforation("Fat"))
 		{
 			F_magnitude = K(1) * needle_penetration + 
 				B(0) * thick(0) * LWR_tip_velocity.norm();
 
-			if (F_magnitude > F_max(1))
+			if (DOP > thick[0] + p_thick[1])
+			{
 				tis.togglePerforation("Fat");
+				blue();
+				cout << "PERFORATED FAT" << endl;
+				reset();
+			}
 		}
 		if (tis.checkPerforation("Fat"))
 			F_magnitude = (B(0) * thick(0) + B(1) * needle_penetration) * LWR_tip_velocity.norm();
@@ -2906,14 +2918,19 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 
 	// If the needle is in the fat
 	case 2:
-		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[2]).norm();
 		if (!tis.checkPerforation("Muscle"))
 		{
 			F_magnitude = K(2) * needle_penetration +
 				(B(0) * thick(0) + B(1) * thick(1)) * LWR_tip_velocity.norm();
 
-			if (F_magnitude > F_max(1))
+			if (DOP > thick[0] + thick[1] + p_thick[2])
+			{
 				tis.togglePerforation("Muscle");
+				yellow();
+				cout << "PERFORATED MUSCLE" << endl;
+				reset();
+			}
 		}
 		if (tis.checkPerforation("Muscle"))
 			F_magnitude = (B(0) * thick(0) + B(1) * thick(1) + B(2) * needle_penetration) * LWR_tip_velocity.norm();
@@ -2921,7 +2938,7 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 
 		// If the needle is in the bone
 	case 3:
-		needle_penetration = (LWR_tip_pos - contact_pos_vector[0]).norm();
+		needle_penetration = (LWR_tip_pos - contact_pos_vector[3]).norm();
 		if (!tis.checkPerforation("Bone"))
 		{
 			F_magnitude = K(3) * needle_penetration +
@@ -2934,6 +2951,15 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 	}
 
 	ext_F = F_magnitude * F_dir;
+
+	simSetGraphUserData(ext_force_graph_handler, "Ext_F_x", (float)ext_F.x());
+	simSetGraphUserData(ext_force_graph_handler, "Ext_F_y", (float)ext_F.y());
+	simSetGraphUserData(ext_force_graph_handler, "Ext_F_z", (float)ext_F.z());
+	simSetGraphUserData(ext_force_graph_handler, "Ext_F_MAGN", (float)F_magnitude);
+
+	simSetGraphUserData(force_displ_graph_handler, "dop", (float)DOP);
+	simSetGraphUserData(force_displ_graph_handler, "force", (float)F_magnitude);
+
 	return;
 }
 

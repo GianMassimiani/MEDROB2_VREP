@@ -23,7 +23,7 @@ struct Layer
 	int			_handler;
 	int			_static_handler;
 
-	float		_max_force;
+	float		_perforation_thickness;
 
 	Vector3f	_color;
 };
@@ -36,10 +36,10 @@ public:
 	~Tissue();
 
 	void init(void);
-	void addLayer(std::string name, float t, float k, float b, Eigen::Vector3f color);
-	void getAllLayerParam(Eigen::VectorXf& out_t_vec, Eigen::VectorXf& out_k_vec, Eigen::VectorXf& out_b_vec, Eigen::VectorXf& out_fMax_vec);
+	void addLayer(std::string name, float t, float k, float b, float p_t_percetage, Eigen::Vector3f color);
+	void getAllLayerParam(Eigen::VectorXf& out_t_vec, Eigen::VectorXf& out_k_vec, Eigen::VectorXf& out_b_vec, Eigen::VectorXf& out_p_t_vec);
 	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b);
-	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b, float& out_fMax);
+	void getLayerParams(std::string name, float& out_t, float& out_k, float& out_b, float& out_p_t);
 	bool checkPerforation(std::string name);
 	void togglePerforation(std::string name);
 	bool checkTouched(std::string name);

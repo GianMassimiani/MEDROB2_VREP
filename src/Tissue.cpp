@@ -19,17 +19,25 @@ void Tissue::init(void)
 	simSetObjectName(_dummy_rederer_handler, "Tissue_D");
 	return;
 }
-void Tissue::addLayer(std::string name, float t, float k, float b, Eigen::Vector3f color)
+
+
+void Tissue::addLayer(std::string name, float t, float k, float b, float p_t_percetage, Eigen::Vector3f color)
 {
 	Layer temp_l;
-	temp_l._thick			= t;
-	temp_l._name			= name;
-	temp_l._K				= k;
-	temp_l._B				= b;
-	temp_l._color			= color;
-	temp_l._max_force		= t * 0.5f * k; //! Is this true?
-	temp_l._is_perforated	= false;
-	temp_l._touched			= false;
+
+	if (p_t_percetage < 0.0f)
+		p_t_percetage = 0.0f;
+	else if (p_t_percetage > 1.0f)
+		p_t_percetage = 1.0f;
+
+	temp_l._thick					= t;
+	temp_l._name					= name;
+	temp_l._K						= k;
+	temp_l._B						= b;
+	temp_l._perforation_thickness	= t * p_t_percetage;
+	temp_l._color					= color;
+	temp_l._is_perforated			= false;
+	temp_l._touched					= false;
 
 	_layers.push_back(temp_l);
 	_N++;
@@ -64,7 +72,7 @@ void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float&
 }
 
 
-void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float& out_b, float& out_fMax)
+void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float& out_b, float& out_p_t)
 {
 	//! WILL THIS WORK?
 	int idx = -1;
@@ -88,22 +96,22 @@ void Tissue::getLayerParams(std::string name, float& out_t, float& out_k, float&
 	out_t = _layers[idx]._thick;
 	out_k = _layers[idx]._K;
 	out_b = _layers[idx]._B;
-	out_fMax = _layers[idx]._max_force;
+	out_p_t = _layers[idx]._perforation_thickness;
 }
 
-void Tissue::getAllLayerParam(Eigen::VectorXf& out_t_vec, Eigen::VectorXf& out_k_vec, Eigen::VectorXf& out_b_vec, Eigen::VectorXf& out_fMax_vec)
+void Tissue::getAllLayerParam(Eigen::VectorXf& out_t_vec, Eigen::VectorXf& out_k_vec, Eigen::VectorXf& out_b_vec, Eigen::VectorXf& out_p_t_vec)
 {
 	out_t_vec.resize(_N);
 	out_k_vec.resize(_N);
 	out_b_vec.resize(_N);
-	out_fMax_vec.resize(_N);
+	out_p_t_vec.resize(_N);
 
 	for (int i = 0; i < _N; i++)
 	{
 		out_t_vec(i) = _layers[i]._thick;
 		out_k_vec(i) = _layers[i]._K;
 		out_b_vec(i) = _layers[i]._B;
-		out_fMax_vec(i) = _layers[i]._max_force;
+		out_p_t_vec(i) = _layers[i]._perforation_thickness;
 	}
 }
 
