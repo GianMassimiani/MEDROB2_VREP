@@ -178,7 +178,7 @@ void setDHParameter(Vector7f& a_vec, Vector7f& alpha_vec, Vector7f& d_vec)
 	float lung_4 = 200.0f / 1000.0f;
 	float lung_5 = 190.0f / 1000.0f;
 	float lung_7 = 112.0f / 1000.0f;
-	float offset = 78.0f / 1000.0f + 0.1f;
+	float offset = 150.0f / 1000.0f;
 
 	//inizializzazione dei parametri cinematici e dei parametri della notazione di Denavit-Hartenbger
 	a_vec.setZero();
@@ -234,6 +234,7 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	Vector7f auxiliary_vector;
 	for (int j = 0; j<7; j++)
 		auxiliary_vector(j) = (float)rand() / (float)RAND_MAX;
+	auxiliary_vector.setZero();
 
 	Vector7f range_space_velocities, null_space_velocities;
 	Matrix7f I;
@@ -243,17 +244,50 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
 	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
 	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
+
+	Matrix4f error_R_2;
+	float sim_error_R_2[12];
+	error_R_2.setZero();
+	error_R_2.block<3, 3>(0, 0) = error_R;
+	eigen2SimTransf(error_R_2, sim_error_R_2);
+
+
 	float sim_error_R[9];
 	eigen2SimRot(error_R, sim_error_R);
-	simGetEulerAnglesFromMatrix(sim_error_R, sim_error_angle);
+	simGetEulerAnglesFromMatrix(sim_error_R_2, sim_error_angle);
 	sim2EigenVec3f(sim_error_angle, error_angle);
 
+
+	//! PROVA
+	Vector3f angleD, angleC;
+	float sim_angleD[3];
+	float sim_angleC[3];
+	float sim_des_T[12];
+	float sim_curr_T[12];
+
+	eigen2SimTransf(des_T, sim_des_T);
+	eigen2SimTransf(curr_T, sim_curr_T);
+
+	simGetEulerAnglesFromMatrix(sim_des_T, sim_angleD);
+	simGetEulerAnglesFromMatrix(sim_curr_T, sim_angleC);
+
+	sim2EigenVec3f(sim_angleC, angleC);
+	sim2EigenVec3f(sim_angleD, angleD);
+
+
+	error_angle.setZero();
 	total_error << error_pos, error_angle;
-	
-	if (error_pos.norm() <= 0.05)
-		r_dot = des_vel;
-	else
-		r_dot = des_vel + Kp * total_error;
+
+	simSetGraphUserData(41, "Ext_F_x", (float)angleC.x());
+	simSetGraphUserData(41, "Ext_F_y", (float)angleC.y());
+	simSetGraphUserData(41, "Ext_F_z", (float)angleC.z());
+
+	Vector6f temp_dv;
+	temp_dv.setZero();
+	temp_dv.block<3, 1>(0, 0) = des_vel.block<3, 1>(0, 0);
+
+	r_dot = des_vel + Kp * total_error;
+	//r_dot = temp_dv + Kp * total_error;
 
 	range_space_velocities = pinv_J * r_dot;
 	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;

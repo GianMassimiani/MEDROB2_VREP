@@ -180,6 +180,7 @@ Vector3f tool_vel, tool_omega;
 VectorXf lwr_q_dot(7);
 MatrixXf lwr_J(6,7);
 VectorXf lwr_desired_q(7);
+
 std::vector<float> lwr_curr_q_vector;
 
 // Contact point
@@ -2402,7 +2403,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			LPFilter(tool_tip_omega_vector, tool_omega, tool_tip_mean_omega_vector, tool_tip_LPF_omega, false);
 
 			updatePose();
-			//updateRobotPose(tool_tip_handler);
+			updateRobotPose(tool_tip_handler);
 			computeGlobalForce();
 			break;
 		case 2:
@@ -2416,7 +2417,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			updateRot();
-			//updateRobotPose(tool_tip_handler);
+			updateRobotPose(tool_tip_handler);
 			break;
 		case 3:
 			if (first_press)
@@ -2458,7 +2459,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			updatePose();
 			updatePosPenetration();
-			//updateRobotPose(lwr_target_handler);
+			updateRobotPose(lwr_target_handler);
 			manageContact();
 			tool_tip_external_F.setZero();
 			if (contact_points.size() > 0)
@@ -2494,7 +2495,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 
 		// COUT
-		want_to_print = true;
+		//want_to_print = true;
 
 		if (global_cnt % 100 == 0 && want_to_print)
 		{
@@ -3049,9 +3050,9 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 
 	ext_F = F_magnitude * F_dir;
 
-	simSetGraphUserData(ext_force_graph_handler, "Ext_F_x", (float)ext_F.x());
-	simSetGraphUserData(ext_force_graph_handler, "Ext_F_y", (float)ext_F.y());
-	simSetGraphUserData(ext_force_graph_handler, "Ext_F_z", (float)ext_F.z());
+	//simSetGraphUserData(ext_force_graph_handler, "Ext_F_x", (float)ext_F.x());
+	//simSetGraphUserData(ext_force_graph_handler, "Ext_F_y", (float)ext_F.y());
+	//simSetGraphUserData(ext_force_graph_handler, "Ext_F_z", (float)ext_F.z());
 	simSetGraphUserData(ext_force_graph_handler, "Ext_F_MAGN", (float)F_magnitude);
 
 	simSetGraphUserData(force_displ_graph_handler, "dop", (float)DOP);
@@ -3150,8 +3151,7 @@ void updateRobotPose(int target_handler)
 	Matrix4f lwr_tip_T, target_T;
 	Matrix6f K_p;
 	K_p.setIdentity();
-	K_p = K_p * 1.6f;
-	K_p.block<3, 3>(3, 0).setZero();
+	K_p.block<3, 3>(3, 3) *= 0.5f;
 	//K_p.setZero();
 
 	float sim_target_T[12];
@@ -3184,22 +3184,21 @@ void updateRobotPose(int target_handler)
 
 	//! Jac
 	lwr_J = LWRGeometricJacobian(lwr_current_q);
-
+	
 	//! Compute q_dot
-	//lwr_q_dot = computeNSVel(tool_tip_r_dot_d, lwr_J);
 	computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, target_T, lwr_tip_T, lwr_J, K_p);
-	//computeDLSVelocity(lwr_q_dot, tool_tip_r_dot_d, tool_tip_T, lwr_tip_T, lwr_J, K_p);
 
 	//! Linear integration
 	lwr_q = lwr_current_q + lwr_q_dot * time_step;
 
 	//Vector7f a_vec, alpha_vec, d_vec;
-	//Matrix4f T, T1;
+	//Matrix4f T;
 	//setDHParameter(a_vec, alpha_vec, d_vec);
 	//T = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_q, 7);
-	//T1 = cinematicaDiretta(a_vec, alpha_vec, d_vec, lwr_current_q, 7);
-	//Vector3f ee_iniziale_pos = T1.block<3, 1>(0, 3);
-	//Vector3f ee_calculated_pos = T.block<3, 1>(0, 3);
+	//Vector3f ee_pos = T.block<3, 1>(0, 3);
+	//float sim_ee_pos[3];
+	//eigen2SimVec3f(ee_pos, sim_ee_pos);
+	//simSetObjectPosition(DK_dummy, -1, sim_ee_pos);
 
 	eigen2SimVec7f(lwr_q, sim_lwr_q);
 
@@ -3207,15 +3206,10 @@ void updateRobotPose(int target_handler)
 	for (int i = 0; i < 7; i++)
 		simSetJointTargetPosition(lwr_joint_handlers[i], sim_lwr_q[i]);
 
-	//float sim_ee_calculated_pos[3];
-	//eigen2SimVec3f(ee_iniziale_pos, sim_ee_calculated_pos);
-	//simSetObjectPosition(lwr_target_handler, -1, sim_ee_calculated_pos);
-
 
 	//cout << "tool_tip_lin_vel\n" << tool_tip_lin_vel << endl;
 	//cout << "tool_tip_ang_vel\n" << tool_tip_ang_vel << endl;
 	//cout << "J:\n" << lwr_J << endl;
 
-	//cout << "EE - tool_pos:\n" << ee_calculated_pos - tool_pos << endl;
 	//cout << "q_dot calcolate:\n" << lwr_q_dot << endl;
 }

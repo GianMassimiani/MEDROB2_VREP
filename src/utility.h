@@ -84,3 +84,5 @@ VectorXf deg2radVec(VectorXf a);
 
 inline float rad2deg(float b) { return (float)((b / M_PI * 180.0f)); };
 inline float deg2rad(float a) { return (float)((a / 180.0f * M_PI)); };
+
+inline void rotMatrix(Matrix2f& M, const float angle) { M << cos(angle), -sin(angle), sin(angle), cos(angle); };
