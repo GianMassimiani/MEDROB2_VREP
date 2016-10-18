@@ -135,6 +135,8 @@ double LowestStiffness = -1.0;
 // ------------------------------------------------------------------------- //
 typedef std::vector<Eigen::Vector3f> Vector3fVector;
 
+bool ABILITA_LE_FORZE = false;
+
 DeviceState device_state;
 #define DEVICE_IDX 0
 #define TOOL_RADIUS 0.005
@@ -168,7 +170,7 @@ bool first_press = true;
 int global_cnt = 0;
 
 Vector3d global_device_force(0.0, 0.0, 0.0);
-Vector3f tool_tip_external_F(0.0, 0.0, 0.0);
+Vector3f lwr_tip_external_F(0.0, 0.0, 0.0);
 std::vector<Eigen::Vector3f> tissue_params;
 
 Matrix4f offset_transform;
@@ -177,6 +179,7 @@ Matrix3f rot_offset;
 Matrix3f force_offset_rot;
 Vector3f F_mc;
 Vector3f tool_vel, tool_omega;
+Vector3f lwr_tip_vel, lwr_tip_omega;
 VectorXf lwr_q_dot(7);
 MatrixXf lwr_J(6,7);
 VectorXf lwr_desired_q(7);
@@ -220,6 +223,14 @@ Vector3f tool_tip_LPF_omega(0.0, 0.0, 0.0); //! ATTENZIONE questo deve essere lw
 std::vector<Eigen::Vector3f> tool_tip_omega_vector(buffer_vel_size);
 std::vector<Eigen::Vector3f> tool_tip_mean_omega_vector(buffer_vel_size);
 
+Vector3f lwr_tip_LPF_vel(0.0, 0.0, 0.0);
+std::vector<Eigen::Vector3f> lwr_tip_vel_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> lwr_tip_mean_vel_vector(buffer_vel_size);
+
+Vector3f lwr_tip_LPF_omega(0.0, 0.0, 0.0);
+std::vector<Eigen::Vector3f> lwr_tip_omega_vector(buffer_vel_size);
+std::vector<Eigen::Vector3f> lwr_tip_mean_omega_vector(buffer_vel_size);
+
 float time_step;
 
 // Fake movement parameters
@@ -239,7 +250,7 @@ void updateRot(void);
 void updatePosPenetration(void); // o.O
 void updatePose(void);
 void getOffset(void);
-void updateRobotPose(int target_handler);
+void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f target_ang_vel);
 void manageContact(void);
 
 // Force functions
@@ -2330,6 +2341,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			moveFakeDevice(device_state);
 		}
 
+		float sim_lwr_tip_vel[3];
+		float sim_lwr_tip_omega[3];
 		float sim_tool_vel[3];
 		float sim_tool_omega[3];
 		float sim_dummy_T[12];
@@ -2344,17 +2357,19 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		button = chai3DGetButton(DEVICE_IDX);
 
 		//! ATTENZIONE tool_tip -> lwr_tip quando il robot funzionerà
-		float sim_tool_tip_pos[3];
-		Vector3f tool_tip_pos;
-		simGetObjectPosition(tool_tip_handler, -1, sim_tool_tip_pos);
-		sim2EigenVec3f(sim_tool_tip_pos, tool_tip_pos);
-
+		float sim_lwr_tip_pos[3];
+		Vector3f lwr_tip_pos;
+		simGetObjectPosition(tool_tip_handler, -1, sim_lwr_tip_pos);
+		sim2EigenVec3f(sim_lwr_tip_pos, lwr_tip_pos);
+		float sim_tool_tip_lin_vel[3];
+		float sim_tool_tip_ang_vel[3];
+		Vector3f tool_tip_lin_vel, tool_tip_ang_vel;
 
 		// Se sei nel tessuto costringi il bottone ad essere 3;
 		int current_layer_IDX = -1;
 		if (contact_points.size() != 0)
 		{
-			current_layer_IDX = tis.getLayerIDXFromDepth(contact_points[0], tool_tip_pos, contact_normals[0]);
+			current_layer_IDX = tis.getLayerIDXFromDepth(contact_points[0], lwr_tip_pos, contact_normals[0]);
 			if (current_layer_IDX != -1)
 				button = 3;
 		}
@@ -2384,10 +2399,14 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				getOffset();
 
 				//! ATTENZIONE ci deve essere lwr_tip al posto di tool_tip
+				//! ??
 				// clear velocity buffers
 				Vector3f zero_tmp;
 				zero_tmp.setZero();
 				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
+				LPFilter(lwr_tip_vel_vector, zero_tmp, lwr_tip_mean_vel_vector, lwr_tip_LPF_vel, true);
+				LPFilter(lwr_tip_omega_vector, zero_tmp, lwr_tip_mean_omega_vector, lwr_tip_LPF_omega, true);
+
 				LPFilter(tool_tip_vel_vector, zero_tmp, tool_tip_mean_vel_vector, tool_tip_LPF_vel, true);
 				LPFilter(tool_tip_omega_vector, zero_tmp, tool_tip_mean_omega_vector, tool_tip_LPF_omega, true);
 
@@ -2403,7 +2422,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			LPFilter(tool_tip_omega_vector, tool_omega, tool_tip_mean_omega_vector, tool_tip_LPF_omega, false);
 
 			updatePose();
-			updateRobotPose(tool_tip_handler);
+			updateRobotPose(tool_tip_handler, tool_tip_LPF_vel, tool_tip_LPF_omega);
 			computeGlobalForce();
 			break;
 		case 2:
@@ -2417,7 +2436,11 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			updateRot();
-			updateRobotPose(tool_tip_handler);
+
+			simGetObjectVelocity(tool_tip_handler, sim_tool_tip_lin_vel, sim_tool_tip_ang_vel);
+			sim2EigenVec3f(sim_tool_tip_lin_vel, tool_tip_lin_vel);
+			sim2EigenVec3f(sim_tool_tip_ang_vel, tool_tip_ang_vel);
+			updateRobotPose(tool_tip_handler, tool_tip_lin_vel, tool_tip_ang_vel);
 			break;
 		case 3:
 			if (first_press)
@@ -2439,8 +2462,12 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				Vector3f zero_tmp;
 				zero_tmp.setZero();
 				LPFilter(device_vel_vector, zero_tmp, device_mean_vel_vector, device_LPF_vel, true);
-				LPFilter(tool_tip_vel_vector, zero_tmp, tool_tip_mean_vel_vector, tool_tip_LPF_vel, true);
-				LPFilter(tool_tip_omega_vector, zero_tmp, tool_tip_mean_omega_vector, tool_tip_LPF_omega, true);
+
+				//LPFilter(tool_tip_vel_vector, zero_tmp, tool_tip_mean_vel_vector, tool_tip_LPF_vel, true);
+				//LPFilter(tool_tip_omega_vector, zero_tmp, tool_tip_mean_omega_vector, tool_tip_LPF_omega, true);
+
+				LPFilter(lwr_tip_vel_vector, zero_tmp, lwr_tip_mean_vel_vector, lwr_tip_LPF_vel, true);
+				LPFilter(lwr_tip_omega_vector, zero_tmp, lwr_tip_mean_omega_vector, lwr_tip_LPF_omega, true);
 
 				getOffset();
 				first_press = false;
@@ -2450,20 +2477,29 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			//! ATTENZIONE ci deve essere lwr_tip al posto di tool_tip
 			LPFilter(device_vel_vector, device_state.vel, device_mean_vel_vector, device_LPF_vel, false);
 
-			simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
-			sim2EigenVec3f(sim_tool_vel, tool_vel);
-			sim2EigenVec3f(sim_tool_omega, tool_omega);
+			simGetObjectVelocity(lwr_tip_handler, sim_lwr_tip_vel, sim_lwr_tip_omega);
+			sim2EigenVec3f(sim_lwr_tip_vel, lwr_tip_vel);
+			sim2EigenVec3f(sim_lwr_tip_omega, lwr_tip_omega);
 
-			LPFilter(tool_tip_vel_vector, tool_vel, tool_tip_mean_vel_vector, tool_tip_LPF_vel, false);
-			LPFilter(tool_tip_omega_vector, tool_omega, tool_tip_mean_omega_vector, tool_tip_LPF_omega, false);
+			LPFilter(lwr_tip_vel_vector, lwr_tip_vel, lwr_tip_mean_vel_vector, lwr_tip_LPF_vel, false);
+			LPFilter(lwr_tip_omega_vector, lwr_tip_omega, lwr_tip_mean_omega_vector, lwr_tip_LPF_omega, false);
 
+
+
+			//! OLD
+			//simGetObjectVelocity(tool_handler, sim_tool_vel, sim_tool_omega);
+			//sim2EigenVec3f(sim_tool_vel, tool_vel);
+			//sim2EigenVec3f(sim_tool_omega, tool_omega);
+
+			//LPFilter(tool_tip_vel_vector, tool_vel, tool_tip_mean_vel_vector, tool_tip_LPF_vel, false);
+			//LPFilter(tool_tip_omega_vector, tool_omega, tool_tip_mean_omega_vector, tool_tip_LPF_omega, false);
 			updatePose();
 			updatePosPenetration();
-			updateRobotPose(lwr_target_handler);
+			updateRobotPose(lwr_target_handler, lwr_tip_LPF_vel, lwr_tip_LPF_omega);
 			manageContact();
-			tool_tip_external_F.setZero();
+			lwr_tip_external_F.setZero();
 			if (contact_points.size() > 0)
-				computeExternalForce(tool_tip_external_F, tool_tip_pos, contact_points, contact_normals[0], tool_tip_LPF_vel); //! QUI
+				computeExternalForce(lwr_tip_external_F, lwr_tip_pos, contact_points, contact_normals[0], lwr_tip_LPF_vel); //! QUI
 			computeGlobalForce();
 			break;
 		default:
@@ -2568,6 +2604,8 @@ void updateRot(void)
 	simGetEulerAnglesFromMatrix(sim_tool_tip_T, sim_tool_tip_angles);
 	simSetObjectOrientation(tool_tip_handler, -1, sim_tool_tip_angles);
 }
+
+
 void updatePosPenetration(void)
 {
 	Vector3f tool_tip_pos, lwr_target_proj_pos, tool_tip_relative_increment;
@@ -2670,8 +2708,8 @@ void computeGlobalForce(void)
 	{
 	case 1:
 		// Pos/Force-Pos (Non-uniform matrix port)
-		//F_mc = (K_m * tool_tip_external_F) + (B_m * (device_state.vel - tool_vel));
-		F_mc = (K_m * tool_tip_external_F) + (B_m * (device_LPF_vel - tool_tip_LPF_vel));
+		//F_mc = (K_m * lwr_tip_external_F) + (B_m * (device_state.vel - tool_vel));
+		F_mc = (K_m * lwr_tip_external_F) + (B_m * (device_LPF_vel - lwr_tip_LPF_vel));
 		break;
 	case 2:
 		// Pos / Pos
@@ -2682,7 +2720,7 @@ void computeGlobalForce(void)
 		break;
 	case 3:
 		// Pos / Force
-		F_mc = K_m * tool_tip_external_F;
+		F_mc = K_m * lwr_tip_external_F;
 		break;
 	default:
 		// Null force (just in case)
@@ -2691,8 +2729,8 @@ void computeGlobalForce(void)
 	}
 
 	temp_v = F_mc.cast<double>();
-
-	global_device_force = temp_v;
+	if(ABILITA_LE_FORZE)
+		global_device_force = temp_v;
 
 	simSetGraphUserData(force_graph_handler, "F_x", (float)global_device_force.x());
 	simSetGraphUserData(force_graph_handler, "F_y", (float)global_device_force.y());
@@ -2943,6 +2981,7 @@ void checkValues(int init_val, int fin_val, float* param, float default_value, i
 
 }
 
+
 //! RICORDA CHE DEVI USARE LWR TIP PER POSIZIONE E VELOCITA'
 // Forces on the dummy (PENETRATION)
 void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos, 
@@ -3140,10 +3179,9 @@ void moveFakeDevice(DeviceState& state)
 }
 
 
-void updateRobotPose(int target_handler)
+void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f target_ang_vel)
 {
 	Vector6f target_r_dot_d;
-	Vector3f target_lin_vel, target_ang_vel;
 
 	Vector7f lwr_current_q, lwr_q_dot, lwr_q;
 	Matrix6_7f lwr_J;
@@ -3151,12 +3189,9 @@ void updateRobotPose(int target_handler)
 	Matrix4f lwr_tip_T, target_T;
 	Matrix6f K_p;
 	K_p.setIdentity();
-	K_p.block<3, 3>(3, 3) *= 0.5f;
 	//K_p.setZero();
 
 	float sim_target_T[12];
-	float sim_target_lin_vel[3];
-	float sim_target_ang_vel[3];
 
 	float sim_lwr_tip_T[12];
 	float sim_lwr_current_q[7];
@@ -3167,20 +3202,16 @@ void updateRobotPose(int target_handler)
 		simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_current_q[i]);
 	sim2EigenVec7f(sim_lwr_current_q, lwr_current_q);
 
-	// tool_tip pose
+	// target pose
 	simGetObjectMatrix(target_handler, -1, sim_target_T);
 	sim2EigenTransf(sim_target_T, target_T);
+
+
 	// lwr_tip pose
 	simGetObjectMatrix(lwr_tip_handler, -1, sim_lwr_tip_T);
 	sim2EigenTransf(sim_lwr_tip_T, lwr_tip_T);
 
-	// tool-tip
-	simGetObjectVelocity(target_handler, sim_target_lin_vel, sim_target_ang_vel); //! ??!?
-	sim2EigenVec3f(sim_target_lin_vel, target_lin_vel);
-	sim2EigenVec3f(sim_target_ang_vel, target_ang_vel);
-
 	target_r_dot_d << target_lin_vel, target_ang_vel;
-	//tool_tip_r_dot_d << tool_LPF_vel, tool_LPF_omega; // warning
 
 	//! Jac
 	lwr_J = LWRGeometricJacobian(lwr_current_q);

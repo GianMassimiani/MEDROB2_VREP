@@ -241,21 +241,46 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	I.setIdentity();
 	Vector6f r_dot;
 
+	//! Computing position error
 	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
+
+	//! Computing angular error
+	Matrix3f error_R;
 	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
-	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
+	Matrix3f temp_R = tmp_1 * des_T.block<3, 3>(0, 0);
 
-	Matrix4f error_R_2;
-	float sim_error_R_2[12];
-	error_R_2.setZero();
-	error_R_2.block<3, 3>(0, 0) = error_R;
-	eigen2SimTransf(error_R_2, sim_error_R_2);
+	Matrix4f angular_error_T;
+	float sim_angular_error_T[12];
+	angular_error_T.setZero();
+	angular_error_T.block<3, 3>(0, 0) = temp_R;
+	eigen2SimTransf(angular_error_T, sim_angular_error_T);
 
-
-	float sim_error_R[9];
-	eigen2SimRot(error_R, sim_error_R);
-	simGetEulerAnglesFromMatrix(sim_error_R_2, sim_error_angle);
+	simGetEulerAnglesFromMatrix(sim_angular_error_T, sim_error_angle);
 	sim2EigenVec3f(sim_error_angle, error_angle);
+
+	//! T matrix for XYZ rotations
+	Matrix3f T_xyz, T_zyx;
+	T_xyz <<	1,	0,						sin(error_angle(1)),
+				0,	cos(error_angle(0)),	-cos(error_angle(1))*sin(error_angle(0)),
+				0,	sin(error_angle(0)),	cos(error_angle(0))*cos(error_angle(1));
+
+	T_zyx <<	0, -sin(error_angle(2)), cos(error_angle(1))*cos(error_angle(2)),
+				0,	cos(error_angle(2)), cos(error_angle(1))*sin(error_angle(2)),
+				1,	0,					-sin(error_angle(1));
+	error_angle = T_xyz * (error_angle);
+
+
+	////! ANDREA
+	//auto unit = error_angle;
+	//unit.normalize();
+	//simInt d_omega_handler = simGetObjectHandle("Dummy_omega");
+	//Matrix4f d_omega_T;
+	//d_omega_T.setIdentity();
+	//d_omega_T.block<3, 1>(0, 3) = Vector3f(0.0f, -1.0f, 1.0f);
+	//d_omega_T.block<3, 1>(0, 2) = unit;
+	//float sim_d_omega_T[12];
+	//eigen2SimTransf(d_omega_T, sim_d_omega_T);
+	//simSetObjectMatrix(d_omega_handler, -1, sim_d_omega_T);
 
 
 	//! PROVA
@@ -274,13 +299,13 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	sim2EigenVec3f(sim_angleC, angleC);
 	sim2EigenVec3f(sim_angleD, angleD);
 
-
+	auto temp = error_angle;
 	error_angle.setZero();
 	total_error << error_pos, error_angle;
 
-	simSetGraphUserData(41, "Ext_F_x", (float)angleC.x());
-	simSetGraphUserData(41, "Ext_F_y", (float)angleC.y());
-	simSetGraphUserData(41, "Ext_F_z", (float)angleC.z());
+	simSetGraphUserData(41, "Ext_F_x", (float)temp.x());
+	simSetGraphUserData(41, "Ext_F_y", (float)temp.y());
+	simSetGraphUserData(41, "Ext_F_z", (float)temp.z());
 
 	Vector6f temp_dv;
 	temp_dv.setZero();
