@@ -307,10 +307,6 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	//error_angle.setZero();
 	total_error << error_pos, error_angle;
 
-	simSetGraphUserData(41, "Ext_F_x", (float)error_angle.x());
-	simSetGraphUserData(41, "Ext_F_y", (float)error_angle.y());
-	simSetGraphUserData(41, "Ext_F_z", (float)error_angle.z());
-
 	//! R_DOT
 	Vector6f temp_dv;
 	temp_dv.setZero();

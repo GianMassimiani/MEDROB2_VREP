@@ -17,6 +17,7 @@ void Tissue::init(void)
 {
 	_dummy_rederer_handler = simCreateDummy(0.05f, NULL);
 	simSetObjectName(_dummy_rederer_handler, "Tissue_D");
+	simSetObjectInt32Parameter(_dummy_rederer_handler, sim_objintparam_visibility_layer, 0);
 	return;
 }
 
@@ -275,6 +276,7 @@ void Tissue::renderLayers(void)
 		curr_cube_pos << 0, 0, depth;
 		eigen2SimVec3f(curr_cube_pos, sim_curr_cube_pos);
 		float tmp[3] = { _scale[0], _scale[1], _layers[i]._thick };
+
 		//! RESPONDABLE AND DYNAMIC CUBES
 		_cube_handlers.push_back(simCreatePureShape(0, 9, tmp, 1.0, NULL)); //HERE
 		simSetObjectName(_cube_handlers[i], _layers[i]._name.c_str());
