@@ -79,6 +79,8 @@ void simComposeTransform(const float* in_rot, const float* in_pos, float* out_T)
 // and its traslational one (P 3by1).
 void simDecomposeTransform(const float* in_T, float* out_rot, float* out_pos);
 
+float unboundAngle(const float prev_alpha, float curr_alpha);
+
 void simMultiplyVec3fByScalar(float* v, float k);
 VectorXf deg2radVec(VectorXf a);
 

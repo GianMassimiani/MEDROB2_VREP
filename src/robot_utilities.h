@@ -31,8 +31,14 @@ Matrix7_6f pinv(const Matrix6_7f J);
 Matrix<float, 7, 3> pinv(const Matrix<float, 3, 7> J);
 Vector7f computeNSVel(Vector6f r_dot, Matrix6_7f J);
 
+//void computeNullSpaceVelocity(Vector7f& config_q_dot,
+//	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+//	const Matrix6_7f& J, const Matrix6f& Kp);
+
 void computeNullSpaceVelocity(Vector7f& config_q_dot,
-	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Vector6f& des_vel,
+	const Matrix4f& prev_des_T, const Matrix4f& prev_curr_T,
+	const Matrix4f& des_T, const Matrix4f& curr_T,
 	const Matrix6_7f& J, const Matrix6f& Kp);
 
 void computeDLSVelocity(Vector7f& config_q_dot,

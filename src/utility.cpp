@@ -182,6 +182,25 @@ VectorXf deg2radVec(VectorXf a)
 	return b;
 }
 
+float unboundAngle(const float prev_alpha, float curr_alpha)
+{
+	while ((curr_alpha - prev_alpha) < -6.10865)
+		curr_alpha = curr_alpha + 2.0f * (float)M_PI;
+	while ((curr_alpha - prev_alpha) > 6.10865)
+		curr_alpha = curr_alpha - 2.0f * (float)M_PI;
+	return curr_alpha;
+}
+
+
+
+
+
+
+
+
+
+
+
 
 // --------------------------------------------------- //
 // ----------------- COLORE CONSOLE ------------------ //

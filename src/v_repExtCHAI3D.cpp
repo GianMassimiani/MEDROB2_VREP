@@ -135,7 +135,7 @@ double LowestStiffness = -1.0;
 // ------------------------------------------------------------------------- //
 typedef std::vector<Eigen::Vector3f> Vector3fVector;
 
-bool ABILITA_LE_FORZE = false;
+bool ABILITA_LE_FORZE = true;
 
 DeviceState device_state;
 #define DEVICE_IDX 0
@@ -183,6 +183,8 @@ Vector3f lwr_tip_vel, lwr_tip_omega;
 VectorXf lwr_q_dot(7);
 MatrixXf lwr_J(6,7);
 VectorXf lwr_desired_q(7);
+Matrix4f lwr_tip_T, target_T;
+Matrix4f prev_lwr_tip_T, prev_target_T;
 
 std::vector<float> lwr_curr_q_vector;
 
@@ -2212,6 +2214,12 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		//Retrive LWR tip dummy
 		lwr_tip_handler = simGetObjectHandle("LWR_tip");
+
+
+		//! In order to unbound the angular error
+		lwr_tip_T.setZero();
+		target_T.setZero();
+
 		
 		// Graph
 		force_displ_graph_handler = simGetObjectHandle("Force_displ_graph");
@@ -2251,7 +2259,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// TISSUE INIT
 		Vector3f tissue_center;
 		Vector2f tissue_scale;
-		tissue_center << 0.0f, 0.65f, 0.65f;
+		tissue_center << 0.1f, 0.6f, 0.45f;
 		tissue_scale << 0.2f, 0.22f;
 		tis.init();
 
@@ -2265,10 +2273,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		if (use_default_tissue_values)
 		{
-			tis.addLayer("Skin",	0.12f,	331.0f	/ 100.0f,		3.0f * 10.0f,	0.7f,	Vector3f(1.0f, 0.76f, 0.51f));
-			tis.addLayer("Fat",		0.135f,	83.0f	/ 100.0f,		1.0f * 10.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
-			tis.addLayer("Muscle",	0.14f,	497.0f	/ 100.0f,		3.0f * 10.0f,	0.2f,	Vector3f(0.77f, 0.3f, 0.3f));
-			tis.addLayer("Bone",	0.12f,	2480.0f	/ 100.0f,		0.0f * 10.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
+			tis.addLayer("Skin",	0.12f * 0.2f,	331.0f	/ 100.0f,		3.0f * 10.0f,	0.7f,	Vector3f(1.0f, 0.76f, 0.51f));
+			tis.addLayer("Fat",		0.13f * 0.2f,	83.0f	/ 100.0f,		1.0f * 10.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
+			tis.addLayer("Muscle",	0.14f * 0.2f,	497.0f	/ 100.0f,		3.0f * 10.0f,	0.2f,	Vector3f(0.77f, 0.3f, 0.3f));
+			tis.addLayer("Bone",	0.12f * 0.2f,	2480.0f	/ 100.0f,		0.0f * 10.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
 		}
 		else
 		{
@@ -3186,7 +3194,6 @@ void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f targe
 	Vector7f lwr_current_q, lwr_q_dot, lwr_q;
 	Matrix6_7f lwr_J;
 
-	Matrix4f lwr_tip_T, target_T;
 	Matrix6f K_p;
 	K_p.setIdentity();
 	//K_p.setZero();
@@ -3196,6 +3203,10 @@ void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f targe
 	float sim_lwr_tip_T[12];
 	float sim_lwr_current_q[7];
 	float sim_lwr_q[7];
+	
+	//! In order to unbound the angular error
+	prev_lwr_tip_T = lwr_tip_T;
+	prev_target_T = target_T;
 
 	//! get raw data
 	for (int i = 0; i < 7; i++)
@@ -3217,7 +3228,10 @@ void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f targe
 	lwr_J = LWRGeometricJacobian(lwr_current_q);
 	
 	//! Compute q_dot
-	computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, target_T, lwr_tip_T, lwr_J, K_p);
+	//computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, target_T, lwr_tip_T, lwr_J, K_p);
+	computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, 
+		prev_target_T, prev_lwr_tip_T, target_T, lwr_tip_T, 
+		lwr_J, K_p);
 
 	//! Linear integration
 	lwr_q = lwr_current_q + lwr_q_dot * time_step;
