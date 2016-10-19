@@ -135,7 +135,7 @@ double LowestStiffness = -1.0;
 // ------------------------------------------------------------------------- //
 typedef std::vector<Eigen::Vector3f> Vector3fVector;
 
-bool ABILITA_LE_FORZE = false;
+bool ABILITA_LE_FORZE = true;
 
 DeviceState device_state;
 #define DEVICE_IDX 0
