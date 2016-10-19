@@ -225,26 +225,27 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
 	const Matrix6_7f& J, const Matrix6f& Kp)
 {
-	//! CARTESIAN ERROR
 	Vector3f error_pos, error_angle;
 	Vector6f total_error;
 	float sim_error_angle[3];
-	Matrix7_6f pinv_J = pinv(J);
-
-	Vector7f auxiliary_vector;
-	for (int j = 0; j<7; j++)
-		auxiliary_vector(j) = (float)rand() / (float)RAND_MAX;
-	auxiliary_vector.setZero();
 
 	Vector7f range_space_velocities, null_space_velocities;
 	Matrix7f I;
 	I.setIdentity();
 	Vector6f r_dot;
 
-	//! Computing position error
+	Matrix7_6f pinv_J = pinv(J);
+
+	//! NULL PROJECTION
+	Vector7f auxiliary_vector;
+	for (int j = 0; j<7; j++)
+		auxiliary_vector(j) = (float)rand() / (float)RAND_MAX;
+	auxiliary_vector.setZero();
+
+	//! POSITION ERROR
 	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
 
-	//! Computing angular error
+	//! ORIENTATION ERROR
 	Matrix3f error_R;
 	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
 	Matrix3f temp_R = tmp_1 * des_T.block<3, 3>(0, 0);
@@ -258,17 +259,33 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	simGetEulerAnglesFromMatrix(sim_angular_error_T, sim_error_angle);
 	sim2EigenVec3f(sim_error_angle, error_angle);
 
+	//! Calculating T_XYZ matrix
+	Vector3f desired_angle, current_angle;
+	float sim_angleD[3];
+	float sim_angleC[3];
+	float sim_des_T[12];
+	float sim_curr_T[12];
+
+	eigen2SimTransf(des_T, sim_des_T);
+	eigen2SimTransf(curr_T, sim_curr_T);
+
+	simGetEulerAnglesFromMatrix(sim_des_T, sim_angleD);
+	simGetEulerAnglesFromMatrix(sim_curr_T, sim_angleC);
+
+	sim2EigenVec3f(sim_angleC, current_angle);
+	sim2EigenVec3f(sim_angleD, desired_angle);
+
+
 	//! T matrix for XYZ rotations
 	Matrix3f T_xyz, T_zyx;
-	T_xyz <<	1,	0,						sin(error_angle(1)),
-				0,	cos(error_angle(0)),	-cos(error_angle(1))*sin(error_angle(0)),
-				0,	sin(error_angle(0)),	cos(error_angle(0))*cos(error_angle(1));
+	T_xyz <<	1,	0,						sin(current_angle(1)),
+				0,	cos(current_angle(0)),	-cos(current_angle(1))*sin(current_angle(0)),
+				0,	sin(current_angle(0)),	cos(current_angle(0))*cos(current_angle(1));
 
-	T_zyx <<	0, -sin(error_angle(2)), cos(error_angle(1))*cos(error_angle(2)),
-				0,	cos(error_angle(2)), cos(error_angle(1))*sin(error_angle(2)),
-				1,	0,					-sin(error_angle(1));
-	error_angle = T_xyz * (error_angle);
-
+	T_zyx <<	0, -sin(current_angle(2)), cos(current_angle(1))*cos(current_angle(2)),
+				0,	cos(current_angle(2)), cos(current_angle(1))*sin(current_angle(2)),
+				1,	0,					-sin(current_angle(1));
+	error_angle = T_xyz * error_angle;
 
 	////! ANDREA
 	//auto unit = error_angle;
@@ -283,22 +300,6 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	//simSetObjectMatrix(d_omega_handler, -1, sim_d_omega_T);
 
 
-	//! PROVA
-	Vector3f angleD, angleC;
-	float sim_angleD[3];
-	float sim_angleC[3];
-	float sim_des_T[12];
-	float sim_curr_T[12];
-
-	eigen2SimTransf(des_T, sim_des_T);
-	eigen2SimTransf(curr_T, sim_curr_T);
-
-	simGetEulerAnglesFromMatrix(sim_des_T, sim_angleD);
-	simGetEulerAnglesFromMatrix(sim_curr_T, sim_angleC);
-
-	sim2EigenVec3f(sim_angleC, angleC);
-	sim2EigenVec3f(sim_angleD, angleD);
-
 	auto temp = error_angle;
 	error_angle.setZero();
 	total_error << error_pos, error_angle;
@@ -307,6 +308,7 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	simSetGraphUserData(41, "Ext_F_y", (float)temp.y());
 	simSetGraphUserData(41, "Ext_F_z", (float)temp.z());
 
+	//! R_DOT
 	Vector6f temp_dv;
 	temp_dv.setZero();
 	temp_dv.block<3, 1>(0, 0) = des_vel.block<3, 1>(0, 0);
@@ -314,6 +316,7 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 	r_dot = des_vel + Kp * total_error;
 	//r_dot = temp_dv + Kp * total_error;
 
+	//! Composing the final q_dot that will be imposed.
 	range_space_velocities = pinv_J * r_dot;
 	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
 
