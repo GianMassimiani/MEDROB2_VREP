@@ -36,11 +36,14 @@ Vector7f computeNSVel(Vector6f r_dot, Matrix6_7f J);
 //	const Matrix6_7f& J, const Matrix6f& Kp);
 
 void computeNullSpaceVelocity(Vector7f& config_q_dot,
+	Vector7f& q_0_dot,
 	const Vector6f& des_vel,
 	const Matrix4f& prev_des_T, const Matrix4f& prev_curr_T,
 	const Matrix4f& des_T, const Matrix4f& curr_T,
 	const Matrix6_7f& J, const Matrix6f& Kp);
 
 void computeDLSVelocity(Vector7f& config_q_dot,
-	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Vector6f& des_vel,
+	const Matrix4f& prev_des_T, const Matrix4f& prev_curr_T,
+	const Matrix4f& des_T, const Matrix4f& curr_T,
 	const Matrix6_7f& J, const Matrix6f& Kp);

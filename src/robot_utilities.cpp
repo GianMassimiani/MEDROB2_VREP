@@ -222,6 +222,7 @@ Matrix6_7f LWRGeometricJacobian(const Vector7f lwr_joint_q)
 
 
 void computeNullSpaceVelocity(Vector7f& config_q_dot,
+	Vector7f& q_0_dot,
 	const Vector6f& des_vel, 
 	const Matrix4f& prev_des_T, const Matrix4f& prev_curr_T,
 	const Matrix4f& des_T, const Matrix4f& curr_T,
@@ -303,7 +304,6 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 
 	error_angle = T_xyz * error_angle;
 
-	auto temp = error_angle;
 	//error_angle.setZero();
 	total_error << error_pos, error_angle;
 
@@ -317,7 +317,7 @@ void computeNullSpaceVelocity(Vector7f& config_q_dot,
 
 	//! Composing the final q_dot that will be imposed.
 	range_space_velocities = pinv_J * r_dot;
-	null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
+	null_space_velocities = (I - pinv_J * J) * q_0_dot;
 
 	config_q_dot = range_space_velocities + null_space_velocities;
 }
@@ -355,94 +355,94 @@ Vector7f computeNSVel(Vector6f r_dot, Matrix6_7f J)
 	return q_dot;
 }
 
+
 void computeDLSVelocity(Vector7f& config_q_dot,
-	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
+	const Vector6f& des_vel,
+	const Matrix4f& prev_des_T, const Matrix4f& prev_curr_T,
+	const Matrix4f& des_T, const Matrix4f& curr_T,
 	const Matrix6_7f& J, const Matrix6f& Kp)
 {
-	//! CARTESIAN ERROR
 	Vector3f error_pos, error_angle;
 	Vector6f total_error;
 	float sim_error_angle[3];
 
+	Vector7f range_space_velocities;
 	Matrix6f I;
 	I.setIdentity();
+	Vector6f r_dot;
 
+	//! POSITION ERROR
 	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
+
+	//! ORIENTATION ERROR
+	Matrix4f angular_error_T;
+	float sim_angular_error_T[12];
+
+	Vector3f desired_angle, current_angle;
+	Vector3f prev_desired_angle, prev_current_angle;
+	float sim_des_angle[3];
+	float sim_curr_angle[3];
+	float sim_prev_des_angle[3];
+	float sim_prev_curr_angle[3];
+	float sim_prev_des_T[12];
+	float sim_prev_curr_T[12];
+	float sim_des_T[12];
+	float sim_curr_T[12];
+	Matrix3f error_R;
+
 	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
-	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
-	float sim_error_R[9];
-	eigen2SimRot(error_R, sim_error_R);
-	simGetEulerAnglesFromMatrix(sim_error_R, sim_error_angle);
+	Matrix3f temp_R = tmp_1 * des_T.block<3, 3>(0, 0);
+
+	angular_error_T.setZero();
+	angular_error_T.block<3, 3>(0, 0) = temp_R;
+	eigen2SimTransf(angular_error_T, sim_angular_error_T);
+
+	simGetEulerAnglesFromMatrix(sim_angular_error_T, sim_error_angle);
 	sim2EigenVec3f(sim_error_angle, error_angle);
+
+	//! Unbound the error
+	eigen2SimTransf(des_T, sim_des_T);
+	eigen2SimTransf(curr_T, sim_curr_T);
+	eigen2SimTransf(prev_des_T, sim_prev_des_T);
+	eigen2SimTransf(prev_curr_T, sim_prev_curr_T);
+
+	simGetEulerAnglesFromMatrix(sim_des_T, sim_des_angle);
+	simGetEulerAnglesFromMatrix(sim_curr_T, sim_curr_angle);
+	simGetEulerAnglesFromMatrix(sim_prev_des_T, sim_prev_des_angle);
+	simGetEulerAnglesFromMatrix(sim_prev_curr_T, sim_prev_curr_angle);
+
+	sim2EigenVec3f(sim_curr_angle, current_angle);
+	sim2EigenVec3f(sim_des_angle, desired_angle);
+	sim2EigenVec3f(sim_prev_curr_angle, prev_current_angle);
+	sim2EigenVec3f(sim_prev_des_angle, prev_desired_angle);
+
+	for (int i = 0; i < 3; i++)
+	{
+		current_angle(i) = unboundAngle(prev_current_angle(i), current_angle(i));
+		desired_angle(i) = unboundAngle(prev_desired_angle(i), desired_angle(i));
+	}
+
+	//! Calculating T_XYZ matrix
+	Matrix3f T_xyz;
+	T_xyz << 1, 0, sin(current_angle(1)),
+		0, cos(current_angle(0)), -cos(current_angle(1))*sin(current_angle(0)),
+		0, sin(current_angle(0)), cos(current_angle(0))*cos(current_angle(1));
+
+	error_angle = T_xyz * error_angle;
 	total_error << error_pos, error_angle;
 
+	//! R_DOT
+	r_dot = des_vel + Kp * total_error;
 
-	//! r dot
-	Vector6f r_dot;
-	if (error_pos.norm() <= 0.05)
-		r_dot = des_vel;
-	else
-		r_dot = des_vel + Kp * total_error;
-
-	float mu = 0.5;
+	//! Composing the final q_dot that will be imposed.
+	float mu = 0.5f;
 
 	Matrix7_6f J_T = J.transpose();
 	Matrix6f temp = J * J_T + mu * mu * I;
 	temp = temp.inverse();
+
 	config_q_dot = J_T * temp * r_dot;
 }
 
 
 
-
-
-
-/*
-void computeNullSpaceVelocity_DISMISSED(Vector7f& config_q_dot,
-	const Vector6f& des_vel, const Matrix4f& des_T, const Matrix4f& curr_T,
-	const Matrix6_7f& J_full, const Matrix6f& Kp)
-{
-	//! CARTESIAN ERROR
-	Vector3f error_pos, error_angle;
-	Vector6f total_error;
-	float sim_error_angle[3];
-	Matrix<float, 3, 7> J = J_full.block<3, 7>(0, 0);
-	//Matrix7_6f pinv_J = pinv(J);
-	Matrix<float, 7, 3> pinv_J = pinv(J);
-
-	Vector7f auxiliary_vector;
-	for (int j = 0; j<7; j++)
-		auxiliary_vector(j) = (float)rand() / (float)RAND_MAX;
-
-	Vector7f range_space_velocities, null_space_velocities;
-	Matrix7f I;
-	I.setIdentity();
-	//Vector6f r_dot;
-	Vector3f r_dot;
-
-	error_pos = des_T.block<3, 1>(0, 3) - curr_T.block<3, 1>(0, 3);
-	Matrix3f tmp_1 = curr_T.block<3, 3>(0, 0).transpose();
-	Matrix3f error_R = tmp_1 * des_T.block<3, 3>(0, 0);
-	float sim_error_R[9];
-	eigen2SimRot(error_R, sim_error_R);
-	simGetEulerAnglesFromMatrix(sim_error_R, sim_error_angle);
-	sim2EigenVec3f(sim_error_angle, error_angle);
-
-	total_error << error_pos, error_angle;
-
-	if (error_pos.norm() <= 0.05)
-		r_dot = des_vel.block<3, 1>(0, 0);
-	else
-		r_dot = des_vel.block<3, 1>(0, 0) + Kp.block<3, 3>(0, 0) * error_pos;
-
-	//cout << "total_error\n" << total_error << endl;
-	cout << "error_pos\n" << error_pos << endl;
-
-	range_space_velocities = pinv_J * r_dot;
-	//null_space_velocities = (I - pinv_J * J) * auxiliary_vector;
-
-	config_q_dot = range_space_velocities + null_space_velocities.setZero();
-}
-
-
-/**/

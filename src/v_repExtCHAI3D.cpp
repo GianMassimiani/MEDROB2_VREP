@@ -180,9 +180,8 @@ Matrix3f force_offset_rot;
 Vector3f F_mc;
 Vector3f tool_vel, tool_omega;
 Vector3f lwr_tip_vel, lwr_tip_omega;
-VectorXf lwr_q_dot(7);
-MatrixXf lwr_J(6,7);
-VectorXf lwr_desired_q(7);
+Vector7f lwr_init_q;
+Vector7f lwr_q_dot;
 Matrix4f lwr_tip_T, target_T;
 Matrix4f prev_lwr_tip_T, prev_target_T;
 
@@ -2259,7 +2258,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// TISSUE INIT
 		Vector3f tissue_center;
 		Vector2f tissue_scale;
-		tissue_center << 0.15f, 0.5f, 0.45f;
+		tissue_center << 0.15f, 0.5f, 0.37f;
 		tissue_scale << 0.2f, 0.22f;
 		tis.init();
 
@@ -2273,10 +2272,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		if (use_default_tissue_values)
 		{
-			tis.addLayer("Skin",	0.12f * 0.3f,	331.0f	/ 70.0f,		3.0f * 10.0f,	0.7f,	Vector3f(1.0f, 0.76f, 0.51f));
-			tis.addLayer("Fat",		0.13f * 0.3f,	83.0f	/ 70.0f,		1.0f * 10.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
-			tis.addLayer("Muscle",	0.14f * 0.3f,	497.0f	/ 70.0f,		3.0f * 10.0f,	0.2f,	Vector3f(0.77f, 0.3f, 0.3f));
-			tis.addLayer("Bone",	0.12f * 0.3f,	750.0f	/ 100.0f,		0.0f * 10.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
+			tis.addLayer("Skin",	0.12f * 0.3f,	331.0f	/ 20.0f,		3.0f * 50.0f,	0.4f,	Vector3f(1.0f, 0.76f, 0.51f));
+			tis.addLayer("Fat",		0.13f * 0.3f,	83.0f	/ 20.0f,		1.0f * 50.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
+			tis.addLayer("Muscle",	0.14f * 0.3f,	497.0f	/ 20.0f,		3.0f * 50.0f,	0.25f,	Vector3f(0.77f, 0.3f, 0.3f));
+			tis.addLayer("Bone",	0.12f * 0.3f,	1550.0f	/ 20.0f,		0.0f * 50.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
 			//tis.addLayer("Bone", 0.12f * 0.2f, 2480.0f / 100.0f, 0.0f * 10.0f, 0.9f, Vector3f(1.0f, 1.0f, 0.81f));
 		}
 		else
@@ -2319,6 +2318,13 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			reset();
 			lwr_joint_handlers.push_back(simGetObjectHandle(temp_name.c_str()));
 		}
+
+		//! get raw data for the null_space_velocity
+		float sim_lwr_init_q[7];
+		for (int i = 0; i < 7; i++)
+			simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_init_q[i]);
+		sim2EigenVec7f(sim_lwr_init_q, lwr_init_q);
+
 		green();
 		cout << "Finish setup" << endl;
 		reset();
@@ -2387,6 +2393,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			first_press = true;
 			simSetObjectParent(tool_handler, -1, true);
 			simSetObjectParent(tool_tip_handler, tool_handler, true);
+
+			simSetObjectInt32Parameter(lwr_target_handler, sim_objintparam_visibility_layer, 0);
+			simSetObjectInt32Parameter(tool_tip_handler, sim_objintparam_visibility_layer, 1);
+
 			// Se sei fuori dal tessuto allora puoi azzerare le cose e il bottone
 			if (prev_button != button && prev_button == 3)
 			{
@@ -2396,6 +2406,18 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				cout << "Reset tissue" << endl << endl;
 				reset();
 				simResetGraph(force_displ_graph_handler);
+
+				float lwr_target_T[12];
+				simGetObjectMatrix(lwr_target_handler, -1, lwr_target_T);
+
+				simSetObjectParent(tool_tip_handler, -1, true);
+				simSetObjectParent(tool_handler, tool_tip_handler, true);
+
+				simSetObjectMatrix(tool_tip_handler, -1, lwr_target_T);
+
+				simSetObjectParent(tool_handler, -1, true);
+				simSetObjectParent(tool_tip_handler, tool_handler, true);
+
 			}
 		}
 		switch (button)
@@ -2445,7 +2467,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				first_press = false;
 			}
 			updateRot();
-
 			simGetObjectVelocity(tool_tip_handler, sim_tool_tip_lin_vel, sim_tool_tip_ang_vel);
 			sim2EigenVec3f(sim_tool_tip_lin_vel, tool_tip_lin_vel);
 			sim2EigenVec3f(sim_tool_tip_ang_vel, tool_tip_ang_vel);
@@ -2454,6 +2475,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		case 3:
 			if (first_press)
 			{
+				simSetObjectInt32Parameter(lwr_target_handler, sim_objintparam_visibility_layer, 1);
+				simSetObjectInt32Parameter(tool_tip_handler, sim_objintparam_visibility_layer, 0);
 				float sim_lwr_tip_T[12];
 				float sim_tool_tip_T[12];
 				Matrix4f tool_tip_T;
@@ -2505,6 +2528,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			contact_points.clear();
 
 			global_device_force.setZero();
+
+			simSetObjectInt32Parameter(lwr_target_handler, sim_objintparam_visibility_layer, 0);
+			simSetObjectInt32Parameter(tool_tip_handler, sim_objintparam_visibility_layer, 1);
 		}
 
 		prev_button = button;
@@ -3084,6 +3110,7 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 		break;
 	}
 
+
 	ext_F = F_magnitude * F_dir;
 
 	simSetGraphUserData(ext_force_graph_handler, "Ext_F_x", (float)ext_F.x());
@@ -3180,7 +3207,7 @@ void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f targe
 {
 	Vector6f target_r_dot_d;
 
-	Vector7f lwr_current_q, lwr_q_dot, lwr_q;
+	Vector7f lwr_current_q, lwr_q;
 	Matrix6_7f lwr_J;
 
 	//! GAIN for cartesian correction. 
@@ -3220,11 +3247,16 @@ void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f targe
 	//! Jac
 	lwr_J = LWRGeometricJacobian(lwr_current_q);
 	
+	//! Computing null-space velocity
+	Vector7f lwr_q_0_dot = (lwr_init_q - lwr_current_q);
+
 	//! Compute q_dot
-	//computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, target_T, lwr_tip_T, lwr_J, K_p);
-	computeNullSpaceVelocity(lwr_q_dot, target_r_dot_d, 
+	computeNullSpaceVelocity(lwr_q_dot, lwr_q_0_dot, target_r_dot_d,
 		prev_target_T, prev_lwr_tip_T, target_T, lwr_tip_T, 
 		lwr_J, K_p);
+	//computeDLSVelocity(lwr_q_dot, target_r_dot_d,
+	//	prev_target_T, prev_lwr_tip_T, target_T, lwr_tip_T,
+	//	lwr_J, K_p);
 
 	//! Linear integration
 	lwr_q = lwr_current_q + lwr_q_dot * time_step;
