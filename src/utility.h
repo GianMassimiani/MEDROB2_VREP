@@ -9,6 +9,7 @@
 #pragma once
 
 #include <Windows.h>
+#include <signal.h>
 
 #include <iostream>
 #include <algorithm>

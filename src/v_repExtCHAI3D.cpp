@@ -209,6 +209,9 @@ std::vector<std::string> UI_layers_names = { "Skin", "Fat", "Muscle", "Bone"};
 int UI_layer_idx = 0;
 bool use_default_tissue_values = false;
 
+// FILE for exporting data on matlab
+std::ofstream data_file;
+
 
 //! Velocity Filtering
 const int buffer_vel_size = 3;
@@ -2275,7 +2278,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			tis.addLayer("Skin",	0.12f * 0.3f,	331.0f	/ 20.0f,		3.0f * 50.0f,	0.4f,	Vector3f(1.0f, 0.76f, 0.51f));
 			tis.addLayer("Fat",		0.13f * 0.3f,	83.0f	/ 20.0f,		1.0f * 50.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
 			tis.addLayer("Muscle",	0.14f * 0.3f,	497.0f	/ 20.0f,		3.0f * 50.0f,	0.25f,	Vector3f(0.77f, 0.3f, 0.3f));
-			tis.addLayer("Bone",	0.12f * 0.3f,	1550.0f	/ 20.0f,		0.0f * 50.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
+			tis.addLayer("Bone",	0.12f * 0.3f,	1300.0f	/ 20.0f,		0.0f * 50.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
 			//tis.addLayer("Bone", 0.12f * 0.2f, 2480.0f / 100.0f, 0.0f * 10.0f, 0.9f, Vector3f(1.0f, 1.0f, 0.81f));
 		}
 		else
@@ -2324,6 +2327,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		for (int i = 0; i < 7; i++)
 			simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_init_q[i]);
 		sim2EigenVec7f(sim_lwr_init_q, lwr_init_q);
+
+		data_file.open("00_GEOMAGIC_data_file.txt");
 
 		green();
 		cout << "Finish setup" << endl;
@@ -2580,6 +2585,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	if (message == sim_message_eventcallback_simulationended)
 	{
 		hapticReset();
+		data_file.close();
 		red();
 		cout << "*********************************" << endl;
 		cout << "Sim stopped, device disconnected" << endl;
@@ -3120,6 +3126,7 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 
 	simSetGraphUserData(force_displ_graph_handler, "dop", (float)DOP);
 	simSetGraphUserData(force_displ_graph_handler, "force", (float)F_magnitude);
+	data_file << DOP << ", " << F_magnitude << "\n";
 
 	return;
 }
@@ -3215,7 +3222,7 @@ void updateRobotPose(int target_handler, Vector3f target_lin_vel, Vector3f targe
 	//! NB: block<3,3>(3,3) -> angular part;
 	Matrix6f K_p;
 	K_p.setIdentity();
-	K_p.block<3, 3>(0, 0) *= 3.2f;
+	K_p.block<3, 3>(0, 0) *= 4.2f;
 	K_p.block<3, 3>(3, 3) *= 2.5f;
 
 	float sim_target_T[12];
