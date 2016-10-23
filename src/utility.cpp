@@ -85,6 +85,55 @@ void sim2EigenVec3f(const float* in, Vector3f& out)
 	out(2) = in[2];
 }
 
+
+void eigen2SimVec6f(const Vector6f& in, float* out)
+{
+	out[0] = in(0);
+	out[1] = in(1);
+	out[2] = in(2);
+	out[3] = in(3);
+	out[4] = in(4);
+	out[5] = in(5);
+}
+void sim2EigenVec6f(const float* in, Vector6f& out)
+{
+	out(0) = in[0];
+	out(1) = in[1];
+	out(2) = in[2];
+	out(3) = in[3];
+	out(4) = in[4];
+	out(5) = in[5];
+}
+
+void eigen2SimVec7f(const Vector7f& in, float* out)
+{
+	out[0] = in(0);
+	out[1] = in(1);
+	out[2] = in(2);
+	out[3] = in(3);
+	out[4] = in(4);
+	out[5] = in(5);
+	out[6] = in(6);
+}
+void sim2EigenVec7f(const float* in, Vector7f& out)
+{
+	out(0) = in[0];
+	out(1) = in[1];
+	out(2) = in[2];
+	out(3) = in[3];
+	out(4) = in[4];
+	out(5) = in[5];
+	out(6) = in[6];
+}
+
+
+
+
+
+
+
+
+
 void simComposeTransform(const float* in_rot, const float* in_pos, float* out_T)
 {
 	Matrix4f temp_T;
@@ -120,4 +169,124 @@ void simMultiplyVec3fByScalar(float* v, float k)
 	v[0] = v[0] * k;
 	v[1] = v[1] * k;
 	v[2] = v[2] * k;
+}
+
+VectorXf deg2radVec(VectorXf a)
+{
+	VectorXf b = a;
+	int size = a.size();
+	for (int i = 0; i < size; i++)
+	{
+		b(i) = deg2rad(a(i));
+	}
+	return b;
+}
+
+float unboundAngle(const float prev_alpha, float curr_alpha)
+{
+	while ((curr_alpha - prev_alpha) < -6.10865)
+		curr_alpha = curr_alpha + 2.0f * (float)M_PI;
+	while ((curr_alpha - prev_alpha) > 6.10865)
+		curr_alpha = curr_alpha - 2.0f * (float)M_PI;
+	return curr_alpha;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+// --------------------------------------------------- //
+// ----------------- COLORE CONSOLE ------------------ //
+//  Antonio Cifonelli, tutti i diritti sono riservati. //
+// --------------------------------------------------- //
+
+int red()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int green()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int blue()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int yellow()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int magenta()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int cyan()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
+}
+
+int reset()
+{
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdout == INVALID_HANDLE_VALUE)
+	{
+		cout << "Error while getting input handle" << endl;
+		return EXIT_FAILURE;
+	}
+	SetConsoleTextAttribute(hStdout, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
+	return 0;
 }

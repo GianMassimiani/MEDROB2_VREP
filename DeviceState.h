@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <vector>
 #include <Eigen/LU>
 #include <math.h>
 class DeviceState
@@ -25,6 +26,7 @@ public:
 	Eigen::Matrix4f T;
 
 protected:
+	const int v_buffer_size = 4;
 	float* eigen2SimFloat(const Eigen::Vector3f eigen);
 	float** eigen2SimMatrix(const Eigen::Matrix3f eigen);
 
