@@ -21,7 +21,7 @@ In order to build the solution, you have to go through the following steps:
 Once you have successfully built the solution, you can open the scene `robot_scene.ttt` with VREP.
 There are two UIs:
 
-- The first one allows you to enter the properties of the **tissue**, like *K, B, thickness* and the *depth* of each layer after which you will perforate it (expressed in percentace - so a number ![equation](http://www.sciweavers.org/tex2img.php?eq=%5Cin%20%5Cleft%5B%200%2C%201%5Cright%5D&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0) )
+- The first one allows you to enter the properties of the **tissue**, like *K, B, thickness* and the *depth* of each layer after which you will perforate it (expressed in percentace - so a number in [0.0f, 1.0f] )
 - The remaining one allows you to set up the **teleoperation** scheme from the 3 available.
 
 Notice that firstly you have to setup the layer parameter, then you setup the teleoperation and in order **to start the simulation, you must press PLAY from the second UI**, otherwise the scene won't work properly.
