@@ -45,6 +45,9 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <iostream>
+#include <chrono>
+#include <ctime>
+#include <ratio>
 #include <queue>
 #include <vector>
 using namespace std;
@@ -136,6 +139,7 @@ double LowestStiffness = -1.0;
 typedef std::vector<Eigen::Vector3f> Vector3fVector;
 
 bool ABILITA_LE_FORZE = true;
+std::chrono::high_resolution_clock::time_point t_0, t_1;
 
 DeviceState device_state;
 #define DEVICE_IDX 0
@@ -2181,6 +2185,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	// ------------------------------------------------------------------------- //
 	if (message == sim_message_eventcallback_simulationabouttostart)
 	{
+		t_0 = std::chrono::high_resolution_clock::now();
+
 		// Initialize the device
 		// NOTE: the reference frames of the real haptic device and of the virtual 
 		// haptic device coincide. The relation between the real and virtual world 
@@ -2221,22 +2227,25 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// Retrieve the dummy attached to the lwr_ee tip
 		lwr_tip_handler = simGetObjectHandle("LWR_tip");
 
+		// Retrieve the handler of the target dummy, which will be the
+		// DESIRED POSE of the lwr_ee during penetration (so only when
+		// button 3) is pressed
+		lwr_target_handler = simGetObjectHandle("LWR_Target");
+
 		//! In order to unbound the angular error
 		lwr_tip_T.setZero();
 		target_T.setZero();
 
-		
-		// Graph
+		// Graphs handler
 		force_displ_graph_handler	= simGetObjectHandle("Force_displ_graph");
 		force_graph_handler			= simGetObjectHandle("Force_graph");
 		ext_force_graph_handler		= simGetObjectHandle("Ext_force_graph");
 
-		// INITIALIZE THE DEVICE
+		// If there is no device, this will move randomly the robot (WHY? Boh) 
 		if (device_found)
 		{
 			// Read the state of the haptic device (position, rotation, velocity)
 			chai3DReadState(DEVICE_IDX, device_state);
-			device_state.print();
 		}
 		else
 		{
@@ -2247,10 +2256,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			initial_dev_pos[0] /= resolution;
 			initial_dev_pos[1] /= resolution;
 			initial_dev_pos[2] /= resolution;
-			moveFakeDevice(device_state); 
+			moveFakeDevice(device_state);
 		}
-
-		//cout << endl << "Filtered Vel:\n" << device_state.vel << endl;
 
 		// Set Dummy device pose as that of the device state
 		Matrix4f temp = device_state.T;
@@ -2258,8 +2265,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		float scaled_device_T[12];
 		eigen2SimTransf(temp, scaled_device_T);
 		simSetObjectMatrix(dummy_handler, -1, scaled_device_T);
-
-		lwr_target_handler = simGetObjectHandle("LWR_Target");
 
 		// TISSUE INIT
 		Vector3f tissue_center;
@@ -2337,6 +2342,11 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		file_perforation_error.open("02_GEOMAGIC_file_perforation_error.txt");
 		file_contacts_error.open("03_GEOMAGIC_file_contacts_error.txt");
 
+		file_DOP_force << "DOP, Force\n";
+		file_time_forces << "Time, F.x, F.y, F.z, Key\n";
+		file_perforation_error << "Time, Error [mm]\n";
+		file_contacts_error << "Time, Error [mm]\n";
+
 		green();
 		cout << "Finish setup" << endl;
 		reset();
@@ -2369,6 +2379,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		}
 
 		//! For exporting data into external files
+		std::chrono::duration<double> delta_t;
 		float perforation_error;
 		float contact_error;
 		float curr_DOP;
@@ -2559,47 +2570,57 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 				if ((GetAsyncKeyState('a') & 0x8000)
 					|| (GetAsyncKeyState('A') & 0x8000))
 				{
-					cerr << "A" << endl;
 					//! write into contact file
 					for (int i = 0; i < curr_layer_idx; i++)
 						th += thick(i);
 					contact_error = th - curr_DOP;
-					file_contacts_error << simGetSimulationTime() << ", " << contact_error << "\n";
+					t_1 = std::chrono::high_resolution_clock::now();
+					delta_t = std::chrono::duration_cast<std::chrono::duration<double>>(t_1 - t_0);
+					file_contacts_error << delta_t.count() << ", " << contact_error << "\n";
 
 					//! Write into time-forces file
-					file_time_forces << simGetSimulationTime() << ", " <<
+					file_time_forces << delta_t.count() << ", " <<
 						lwr_tip_external_F.x() << ", " <<
 						lwr_tip_external_F.y() << ", " <<
 						lwr_tip_external_F.z() << ", " <<
 						'A' << "\n";
+
+					cerr << delta_t.count() << endl;
 				}
 				else if ((GetAsyncKeyState('s') & 0x8000)
 					|| (GetAsyncKeyState('S') & 0x8000))
 				{
-					cerr << "S" << endl;
 					//! write into perforation file
 					for (int i = 0; i < curr_layer_idx; i++)
 						rel_th += thick(i);
 					rel_th += p_thick(curr_layer_idx);
 					perforation_error = rel_th - curr_DOP;
-					file_contacts_error << simGetSimulationTime() << ", " << perforation_error << "\n";
+
+					t_1 = std::chrono::high_resolution_clock::now();
+					delta_t = std::chrono::duration_cast<std::chrono::duration<double>>(t_1 - t_0);
+
+					file_perforation_error << delta_t.count() << ", " << perforation_error << "\n";
 
 					//! Write into time-forces file
-					file_time_forces << simGetSimulationTime() << ", " <<
+					file_time_forces << delta_t.count() << ", " <<
 						lwr_tip_external_F.x() << ", " <<
 						lwr_tip_external_F.y() << ", " <<
 						lwr_tip_external_F.z() << ", " <<
 						'S' << "\n";
+					cerr << delta_t.count() << endl;
 				}
 				else
 				{
-					cerr << "X" << endl;
+					t_1 = std::chrono::high_resolution_clock::now();
+					delta_t = std::chrono::duration_cast<std::chrono::duration<double>>(t_1 - t_0);
+
 					//! Write into time-forces file
-					file_time_forces << simGetSimulationTime() << ", " <<
+					file_time_forces << delta_t.count() << ", " <<
 						lwr_tip_external_F.x() << ", " <<
 						lwr_tip_external_F.y() << ", " <<
 						lwr_tip_external_F.z() << ", " <<
 						'X' << "\n";
+					cerr << delta_t.count() << endl;
 				}
 			}
 			computeGlobalForce();
