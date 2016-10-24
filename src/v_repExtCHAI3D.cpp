@@ -171,7 +171,12 @@ int global_cnt = 0;
 
 Vector3d global_device_force(0.0, 0.0, 0.0);
 Vector3f lwr_tip_external_F(0.0, 0.0, 0.0);
-std::vector<Eigen::Vector3f> tissue_params;
+
+// Tissue params
+VectorXf K;
+VectorXf B;
+VectorXf p_thick;
+VectorXf thick;
 
 Matrix4f offset_transform;
 Vector3f lin_offset;
@@ -210,7 +215,10 @@ int UI_layer_idx = 0;
 bool use_default_tissue_values = false;
 
 // FILE for exporting data on matlab
-std::ofstream data_file;
+std::ofstream file_DOP_force;
+std::ofstream file_time_forces;
+std::ofstream file_perforation_error;
+std::ofstream file_contacts_error;
 
 
 //! Velocity Filtering
@@ -287,7 +295,7 @@ void checkValues(int init_val,
 void loadLayerParams(int layer_idx);
 void readLayerParams(int layer_idx, float* tmp, int UI_handler);
 
-// fake movement functions declarations
+// Fake movement - when device is not found
 void moveFakeDevice(DeviceState& state);
 
 
@@ -1990,7 +1998,10 @@ void LUA_READ_BUTTONS_CALLBACK(SLuaCallBack* p)
 }
 
 
-// GUAI IN ARRIVO
+// This (funny) function, used in a LUA script is useful to pass quatities
+// calculated into the LUA script to the C++ one. For example, here is used
+// to carry all the contact informations (calculated automatically by the 
+// Contact Managere in the scene) from the LUA script to this C++ plugin.
 #define LUA_READ_CONTACT_INFO_COMMAND "simSalaBim"
 const int inArgs_READ_CONTACT_INFO[] = {
 	4,
@@ -2033,7 +2044,6 @@ void LUA_READ_CONTACT_INFO_CALLBACK(SLuaCallBack* p)
 	data.writeDataToLua(p);
 
 }
-// GUAI FINITI
 
 
 ///  \brief V-REP shared library initialization.
@@ -2090,7 +2100,7 @@ VREP_DLLEXPORT unsigned char v_repStart(void* reservedPointer, int reservedInt)
 
 	std::vector<int> inArgs;
 
-	// **************************** GUAI IN ARRIVO ***************************//
+	// **********************************************************************//
 	CLuaFunctionData::getInputDataForFunctionRegistration(inArgs_READ_CONTACT_INFO, inArgs);
 	simRegisterCustomLuaFunction(LUA_READ_CONTACT_INFO_COMMAND, strConCat("", LUA_READ_CONTACT_INFO_COMMAND, "(table_2 objectInContact,table_3 contactPt,table_3 forceDirectionAndAmplitude, table_3 contactN)"), &inArgs[0], LUA_READ_CONTACT_INFO_CALLBACK);
 	// **********************************************************************//
@@ -2149,7 +2159,7 @@ VREP_DLLEXPORT void v_repEnd()
 
 
 ///  \brief V-REP shared library message processing callback.
-
+///	 This represents the core callback of the VREP plugin.
 VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customData, int* replyData)
 {
 	int   errorModeSaved;
@@ -2159,19 +2169,23 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	simSetIntegerParameter(sim_intparam_error_report_mode, sim_api_errormessage_ignore);
 	simSetIntegerParameter(sim_intparam_error_report_mode, errorModeSaved);
 
+
+	// Reading values put by the user in the 2 UIs.
 	readUI();
 	readLayersUI();
 
 
 	// ------------------------------------------------------------------------- //
-	// ------------------------------------------------------------------------- //
 	// ------------------ WHEN THE USER CLICKS THE PLAY BUTTON ------------------//
-	// ------------------- this function is executed only once ----------------- //
-	// ------------------------------------------------------------------------- //
+	// ------------------ this function is executed only once ------------------ //
 	// ------------------------------------------------------------------------- //
 	if (message == sim_message_eventcallback_simulationabouttostart)
 	{
 		// Initialize the device
+		// NOTE: the reference frames of the real haptic device and of the virtual 
+		// haptic device coincide. The relation between the real and virtual world 
+		// is an identity matrix. Anyway it is possible to scale the dimension of 
+		// the virtual WS setting the value WS_RADIUS.
 		if (chai3DStart(DEVICE_IDX, (float)TOOL_RADIUS, (float)WS_RADIUS) == 1)
 		{
 			device_found = true;
@@ -2180,7 +2194,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			reset();
 		}
 		else
-		{ // TODO, a return here
+		{
 			device_found = false;
 			first_press_fake = true;
 			red();
@@ -2189,34 +2203,23 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			reset();
 		}
 
-		// NOTE: the reference frames of the real haptic device and of the virtual 
-		// haptic device coincide. The relation between the real and virtual world 
-		// is an identity matrix. Anyway it is possible to scale the dimension of 
-		// the virtual WS setting the value WS_RADIUS.
+		// Reading the scene and retreive all the object handlers
 
-		// retrieve the dummy point to be graphically associated with the position of 
-		// the haptic device in the virtual scene.
+		// Dummy point graphically associated with the position of the 
+		// haptic device in the scene.
 		dummy_handler = simGetObjectHandle("Dummy_device");
-		//dummy_handler = simCreateDummy((float)0.05, NULL);
-		//simSetObjectParent(dummy_handler, -1, true);
 
-		// Retrieve the tool dummy, which is associated to the center of the needle mounted on the robot.
+		// Tool dummy, which is associated to the center a reference object used 
+		// to calculate offset required to perform the clutching.
 		tool_handler = simGetObjectHandle("Dummy_tool");
-		//tool_handler = simCreatePureShape(3, 31-8, tool_size, (float)0.001, NULL);
 
-		// TODO: include inertia values -> FULL VREP_LIB REQUIRED
-		//simComputeMassAndInertia(tool_handler, 7860); 
-		//simSetObjectParent(tool_handler, -1, true);
-
-		// Retrieve the dummy to the tip of the tool. 
+		// Retrieve the dummy attached to the tip of the tool; 
+		// this is a reference object, and represents the DESIRED POSE
+		// to which the lwr_EE will converge when the button 1 or 2 is pressed
 		tool_tip_handler = simGetObjectHandle("Dummy_tool_tip");
-		//tool_tip_handler = simCreateDummy((float)0.05, NULL);
-		//simSetObjectIntParameter(tool_tip_handler, 10, 0); // not visible
-		//simSetObjectParent(tool_tip_handler, tool_handler, true);
 
-		//Retrive LWR tip dummy
+		// Retrieve the dummy attached to the lwr_ee tip
 		lwr_tip_handler = simGetObjectHandle("LWR_tip");
-
 
 		//! In order to unbound the angular error
 		lwr_tip_T.setZero();
@@ -2298,6 +2301,7 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		
 		tis.printTissue();
 		tis.renderLayers();
+		tis.getAllLayerParam(thick, K, B, p_thick);
 
 		// Add a plane to substain the tissues
 		float plane_color[3] = { 0.6f, 0.3f, 0.0f };
@@ -2328,7 +2332,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			simGetJointPosition(lwr_joint_handlers[i], &sim_lwr_init_q[i]);
 		sim2EigenVec7f(sim_lwr_init_q, lwr_init_q);
 
-		data_file.open("00_GEOMAGIC_data_file.txt");
+		file_DOP_force.open("00_GEOMAGIC_file_DOP_force.txt");
+		file_time_forces.open("01_GEOMAGIC_file_time_forces.txt");
+		file_perforation_error.open("02_GEOMAGIC_file_perforation_error.txt");
+		file_contacts_error.open("03_GEOMAGIC_file_contacts_error.txt");
 
 		green();
 		cout << "Finish setup" << endl;
@@ -2360,6 +2367,15 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			// Simulate the movement of the device and initialize device_state
 			moveFakeDevice(device_state);
 		}
+
+		//! For exporting data into external files
+		float perforation_error;
+		float contact_error;
+		float curr_DOP;
+		int curr_layer_idx;
+		float th = 0;
+		float rel_th = 0;
+
 
 		float sim_lwr_tip_vel[3];
 		float sim_lwr_tip_omega[3];
@@ -2425,6 +2441,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 			}
 		}
+
+
+
 		switch (button)
 		{
 		case 1:
@@ -2504,6 +2523,12 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 				getOffset();
 				first_press = false;
+
+				//! to retreive data
+				green();
+				cout << "PRESS 'A' WHEN YOU FEEL THE CONTACT WITH A LAYER" << endl;
+				cout << "PRESS 'S' WHEN YOU FEEL THE PERFORATION OF A LAYER" << endl;
+				reset();
 			}
 
 			//! Velocity filtering
@@ -2522,8 +2547,64 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			manageContact();
 			lwr_tip_external_F.setZero();
 			if (contact_points.size() > 0)
+			{
 				computeExternalForce(lwr_tip_external_F, lwr_tip_pos, contact_points, contact_normals[0], lwr_tip_LPF_vel); //! QUI
+
+				//! Retreive data to export in matlab
+				curr_DOP = tis.getDOP(contact_points[0], lwr_tip_pos, contact_normals[0]);
+				curr_layer_idx = tis.getLayerIDXFromDepth(contact_points[0], lwr_tip_pos, contact_normals[0]);
+				th = 0;
+				rel_th = 0;
+
+				if ((GetAsyncKeyState('a') & 0x8000)
+					|| (GetAsyncKeyState('A') & 0x8000))
+				{
+					cerr << "A" << endl;
+					//! write into contact file
+					for (int i = 0; i < curr_layer_idx; i++)
+						th += thick(i);
+					contact_error = th - curr_DOP;
+					file_contacts_error << simGetSimulationTime() << ", " << contact_error << "\n";
+
+					//! Write into time-forces file
+					file_time_forces << simGetSimulationTime() << ", " <<
+						lwr_tip_external_F.x() << ", " <<
+						lwr_tip_external_F.y() << ", " <<
+						lwr_tip_external_F.z() << ", " <<
+						'A' << "\n";
+				}
+				else if ((GetAsyncKeyState('s') & 0x8000)
+					|| (GetAsyncKeyState('S') & 0x8000))
+				{
+					cerr << "S" << endl;
+					//! write into perforation file
+					for (int i = 0; i < curr_layer_idx; i++)
+						rel_th += thick(i);
+					rel_th += p_thick(curr_layer_idx);
+					perforation_error = rel_th - curr_DOP;
+					file_contacts_error << simGetSimulationTime() << ", " << perforation_error << "\n";
+
+					//! Write into time-forces file
+					file_time_forces << simGetSimulationTime() << ", " <<
+						lwr_tip_external_F.x() << ", " <<
+						lwr_tip_external_F.y() << ", " <<
+						lwr_tip_external_F.z() << ", " <<
+						'S' << "\n";
+				}
+				else
+				{
+					cerr << "X" << endl;
+					//! Write into time-forces file
+					file_time_forces << simGetSimulationTime() << ", " <<
+						lwr_tip_external_F.x() << ", " <<
+						lwr_tip_external_F.y() << ", " <<
+						lwr_tip_external_F.z() << ", " <<
+						'X' << "\n";
+				}
+			}
 			computeGlobalForce();
+			
+
 			break;
 		default:
 			first_press = true;
@@ -2566,9 +2647,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 			cout << "Button idx: \t" << button << endl;
 			reset();
 
-			//cout << "************ Device state *************\n";
-			//device_state.print();
-			//cout << "***************************************" << endl;
 		}
 		global_cnt++;
 	}
@@ -2585,7 +2663,10 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 	if (message == sim_message_eventcallback_simulationended)
 	{
 		hapticReset();
-		data_file.close();
+		file_DOP_force.close();
+		file_perforation_error.close();
+		file_contacts_error.close();
+		file_time_forces.close();
 		red();
 		cout << "*********************************" << endl;
 		cout << "Sim stopped, device disconnected" << endl;
@@ -3126,7 +3207,7 @@ void computeExternalForce(Vector3f& ext_F, const Vector3f& LWR_tip_pos,
 
 	simSetGraphUserData(force_displ_graph_handler, "dop", (float)DOP);
 	simSetGraphUserData(force_displ_graph_handler, "force", (float)F_magnitude);
-	data_file << DOP << ", " << F_magnitude << "\n";
+	file_DOP_force << DOP << ", " << F_magnitude << "\n";
 
 	return;
 }
