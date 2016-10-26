@@ -157,7 +157,8 @@ simInt tool_handler;
 simInt tool_tip_handler;
 simInt lwr_target_handler;
 simInt lwr_tip_handler;
-simFloat resolution = 1.7f;
+simInt lwr_needle_handler;
+simFloat resolution = 0.75f;
 simInt force_displ_graph_handler;
 simInt force_graph_handler;
 simInt ext_force_graph_handler;
@@ -2232,6 +2233,8 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 		// button 3) is pressed
 		lwr_target_handler = simGetObjectHandle("LWR_Target");
 
+		lwr_needle_handler = simGetObjectHandle("Needle");
+
 		//! In order to unbound the angular error
 		lwr_tip_T.setZero();
 		target_T.setZero();
@@ -2283,9 +2286,9 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 
 		if (use_default_tissue_values)
 		{
-			tis.addLayer("Skin",	0.12f * 0.3f,	331.0f	/ 20.0f,		3.0f * 50.0f,	0.4f,	Vector3f(1.0f, 0.76f, 0.51f));
-			tis.addLayer("Fat",		0.13f * 0.3f,	83.0f	/ 20.0f,		1.0f * 50.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
-			tis.addLayer("Muscle",	0.14f * 0.3f,	497.0f	/ 20.0f,		3.0f * 50.0f,	0.25f,	Vector3f(0.77f, 0.3f, 0.3f));
+			tis.addLayer("Skin",	0.12f * 0.3f,	331.0f	/ 10.0f,		3.0f * 50.0f,	0.4f,	Vector3f(1.0f, 0.76f, 0.51f));
+			tis.addLayer("Fat",		0.13f * 0.3f,	83.0f	/ 10.0f,		1.0f * 50.0f,	0.1f,	Vector3f(1.0f, 1.0f, 0.51f));
+			tis.addLayer("Muscle",	0.14f * 0.3f,	497.0f	/ 10.0f,		3.0f * 50.0f,	0.25f,	Vector3f(0.77f, 0.3f, 0.3f));
 			tis.addLayer("Bone",	0.12f * 0.3f,	1300.0f	/ 20.0f,		0.0f * 50.0f,	0.9f,	Vector3f(1.0f, 1.0f, 0.81f));
 			//tis.addLayer("Bone", 0.12f * 0.2f, 2480.0f / 100.0f, 0.0f * 10.0f, 0.9f, Vector3f(1.0f, 1.0f, 0.81f));
 		}
@@ -2584,8 +2587,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 						lwr_tip_external_F.y() << ", " <<
 						lwr_tip_external_F.z() << ", " <<
 						'A' << "\n";
-
-					cerr << delta_t.count() << endl;
 				}
 				else if ((GetAsyncKeyState('s') & 0x8000)
 					|| (GetAsyncKeyState('S') & 0x8000))
@@ -2607,7 +2608,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 						lwr_tip_external_F.y() << ", " <<
 						lwr_tip_external_F.z() << ", " <<
 						'S' << "\n";
-					cerr << delta_t.count() << endl;
 				}
 				else
 				{
@@ -2620,7 +2620,6 @@ VREP_DLLEXPORT void* v_repMessage(int message, int* auxiliaryData, void* customD
 						lwr_tip_external_F.y() << ", " <<
 						lwr_tip_external_F.z() << ", " <<
 						'X' << "\n";
-					cerr << delta_t.count() << endl;
 				}
 			}
 			computeGlobalForce();
@@ -2824,8 +2823,10 @@ void computeGlobalForce(void)
 
 	tool_tip_F = dummy_R.col(0); // forza lungo l'asse x del dummy (sempre)	
 	
-	float sim_lwr_tip_pos[3];
-	Vector3f lwr_tip_pos;
+
+	//! Because the Device dummy is mapped on the center of the needle
+	float sim_lwr_needle_pos[3];
+	Vector3f lwr_needle_pos;
 	Vector3f x_md, x_md_dot;
 
 
@@ -2840,14 +2841,13 @@ void computeGlobalForce(void)
 		// Pos / Pos
 		//! F_mc = -K_m(x_m - x_md) - B_m(x_m_DOT - x_md_DOT) con x_md = x_s - x_offset
 		//! x_md -> proiezione di x_s nel 'device space'.
-		simGetObjectPosition(lwr_tip_handler, -1, sim_lwr_tip_pos);
-		sim2EigenVec3f(sim_lwr_tip_pos, lwr_tip_pos);
+		simGetObjectPosition(lwr_needle_handler, -1, sim_lwr_needle_pos);
+		sim2EigenVec3f(sim_lwr_needle_pos, lwr_needle_pos);
 
-		x_md = (lwr_tip_pos - lin_offset)*(1 / resolution);
+		x_md = (lwr_needle_pos - lin_offset)*(1 / resolution);
 		x_md_dot = lwr_tip_LPF_vel * (1 / resolution);
 
 		F_mc = -K_m * (device_state.pos - x_md) - B_m * (device_LPF_vel - x_md_dot);
-
 		break;
 	case 3:
 		// Pos / Force
