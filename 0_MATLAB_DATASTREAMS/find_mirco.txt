@@ -1,0 +1,12 @@
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P1/No_vision_aided/Cont_1
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P1/No_vision_aided/Cont_2
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P1/No_vision_aided/Cont_3
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P1/Vision_aided/Cont_1
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P1/Vision_aided/Cont_2
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P1/Vision_aided/Cont_3
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P2/No_vision_aided/Cont_1
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P2/No_vision_aided/Cont_2
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P2/No_vision_aided/Cont_3
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P2/Vision_aided/Cont_1
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P2/Vision_aided/Cont_2
+/Users/mircocolosi/Downloads/MEDROB2_VREP-master/0_MATLAB_DATASTREAMS/P2/Vision_aided/Cont_3
