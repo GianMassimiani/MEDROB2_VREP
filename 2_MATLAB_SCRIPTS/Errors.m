@@ -19,6 +19,13 @@ for i = 1:length(file_list)
     [parent,aid,~] = fileparts(parent);
     [~,user,~] = fileparts(parent);
     T = readtable(fullfile(path,'01_GEOMAGIC_file_time_forces.txt'));
+    R = readtable(fullfile(path,'03_GEOMAGIC_file_contacts_error.txt'));
+    Tis = table(cell(height(R),1),'VariableNames', {'Tissue'});
+    R = [R Tis];
+    S = readtable(fullfile(path,'02_GEOMAGIC_file_perforation_error.txt'));
+    Tis = table(cell(height(S),1),'VariableNames', {'Tissue'});
+    S = [S Tis];
+        
     if(strcmp('Vision_aided', aid))
         aid = 'VisionAid';
     else
@@ -102,11 +109,24 @@ for i = 1:length(file_list)
     
     legend(plot_handlers, 'Location', 'northwest');
     
+    
+    
+    
+    for i = 1:length(R.Time)
+        R.Time(i)
+        plot(R.Time(i), sum(yl)/2, 'x', 'Color', [0,0,1]);
+        str = input('Tissue? ','s');
+        R.Tissue{i} = str;
+    end
+        
+    for i = 1:length(S.Time)
+        S.Time(i)
+        plot(S.Time(i), sum(yl)/2, 'o', 'Color', [1,0,0]);
+        str = input('Tissue? ','s');
+        S.Tissue{i} = str;
+    end
+    writetable(R,fullfile(path,'03_GEOMAGIC_file_contacts_error.txt'));
+    writetable(S,fullfile(path,'02_GEOMAGIC_file_perforation_error.txt'));
     hold off;
-    
-    name = fullfile(path, [user, '_', aid, '_', controller, '.png']);
-    
-    print(name, '-dpng');
-    
     close all
 end

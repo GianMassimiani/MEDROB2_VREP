@@ -2,7 +2,7 @@ clc; clear all; close all;
 
 % import root of the experiments
 %path = uigetdir('C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\0_MATLAB_DATASTREAMS', 'Select data file');
-addpath('C:\Users\Istin\Documents\CHAI3D\modules\MEDROB2_VREP\0_MATLAB_DATASTREAMS');
+addpath(fullfile('..','0_MATLAB_DATASTREAMS'));
 
 fid=fopen('f.txt');
 tline = fgetl(fid);
