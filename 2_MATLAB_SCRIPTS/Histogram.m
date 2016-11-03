@@ -14,8 +14,11 @@ fclose(fid);
 
 m = containers.Map({'s','f','m','b'},{1,2,3,4});
 
-vision_aided_graph = zeros(3,2,4); %controller, user, layer
-no_vision_aided_graph = zeros(3,2,4); %controller, user, layer
+contact_vision_aided_graph = zeros(3,2,4); %controller, user, layer
+contact_no_vision_aided_graph = zeros(3,2,4); %controller, user, layer
+
+perforation_vision_aided_graph = zeros(3,2,4); %controller, user, layer
+perforation_no_vision_aided_graph = zeros(3,2,4); %controller, user, layer
 
 for i = 1:length(file_list)
     path = file_list{i};
@@ -29,21 +32,38 @@ for i = 1:length(file_list)
     if(~isempty(R))
         if (strcmp(aid,'Vision_aided'))
             for j = 1:height(R)
-                vision_aided_graph(str2double(controller(end)), str2double(user(end)), m(R.Tissue{j})) = R.Error_mm_(j);
+                contact_vision_aided_graph(str2double(controller(end)), str2double(user(end)), m(R.Tissue{j})) = R.Error_mm_(j);
             end
         else
             for j = 1:height(R)
-                no_vision_aided_graph(str2double(controller(end)), str2double(user(end)), m(R.Tissue{j})) = R.Error_mm_(j);
+                contact_no_vision_aided_graph(str2double(controller(end)), str2double(user(end)), m(R.Tissue{j})) = R.Error_mm_(j);
             end
         end
-        
     end
+    
+    if(~isempty(S))
+        if (strcmp(aid,'Vision_aided'))
+            for j = 1:height(S)
+                perforation_vision_aided_graph(str2double(controller(end)), str2double(user(end)), m(S.Tissue{j})) = S.Error_mm_(j);
+            end
+        else
+            for j = 1:height(S)
+                perforation_no_vision_aided_graph(str2double(controller(end)), str2double(user(end)), m(S.Tissue{j})) = S.Error_mm_(j);
+            end
+        end
+    end
+    
+    
     
 end
 
-mean_vision_aided_graph = (vision_aided_graph(:,1,:) + vision_aided_graph(:,2,:))./2;
+mean_contact_vision_aided_graph = (contact_vision_aided_graph(:,1,:) + contact_vision_aided_graph(:,2,:))./2;
+mean_contact_no_vision_aided_graph = (contact_no_vision_aided_graph(:,1,:) + contact_no_vision_aided_graph(:,2,:))./2;
 
-mean_no_vision_aided_graph = (no_vision_aided_graph(:,1,:) + no_vision_aided_graph(:,2,:))./2;
+mean_perforation_vision_aided_graph = (perforation_vision_aided_graph(:,1,:) + perforation_vision_aided_graph(:,2,:))./2;
+mean_perforation_no_vision_aided_graph = (perforation_no_vision_aided_graph(:,1,:) + perforation_no_vision_aided_graph(:,2,:))./2;
+
+
 
 l = {'Skin','Fat','Muscle','Bone'};
 % figure
@@ -79,26 +99,51 @@ l = {'Skin','Fat','Muscle','Bone'};
 % grid on
 
 figure
-barh(-squeeze(mean_vision_aided_graph(:,1,:))');
-title('Vision aided error (m)');
+barh(-squeeze(mean_contact_vision_aided_graph(:,1,:))');
+title('CONTACT Vision aided error (m)');
 set(gca,'yticklabel',l);
 set(gca,'XAxisLocation','top','YAxisLocation','left','ydir','reverse');
 legend('Controller 1', 'Controller 2', 'Controller 3');
 grid on
 
-name = fullfile(parent, '0_Visual_aid_graph.png');
+name = fullfile(parent, '0_Contact_Visual_aid_graph.png');
     
 print(name, '-dpng');
 
 figure
-barh(-squeeze(mean_no_vision_aided_graph(:,1,:))');
-title('No-vision aided error (m)');
+barh(-squeeze(mean_contact_no_vision_aided_graph(:,1,:))');
+title('CONTACT No-vision aided error (m)');
 set(gca,'yticklabel',l);
 set(gca,'XAxisLocation','top','YAxisLocation','left','ydir','reverse');
 legend('Controller 1', 'Controller 2', 'Controller 3');
 grid on
 
-name = fullfile(parent, '1_No_visual_aid_graph.png');
+name = fullfile(parent, '0_Contact_No_visual_aid_graph.png');
+    
+print(name, '-dpng');
+
+
+figure
+barh(-squeeze(mean_perforation_vision_aided_graph(:,1,:))');
+title('PERFORATION Vision aided error (m)');
+set(gca,'yticklabel',l);
+set(gca,'XAxisLocation','top','YAxisLocation','left','ydir','reverse');
+legend('Controller 1', 'Controller 2', 'Controller 3');
+grid on
+
+name = fullfile(parent, '1_Perforation_Visual_aid_graph.png');
+    
+print(name, '-dpng');
+
+figure
+barh(-squeeze(mean_perforation_no_vision_aided_graph(:,1,:))');
+title('PERFORATION No-vision aided error (m)');
+set(gca,'yticklabel',l);
+set(gca,'XAxisLocation','top','YAxisLocation','left','ydir','reverse');
+legend('Controller 1', 'Controller 2', 'Controller 3');
+grid on
+
+name = fullfile(parent, '1_Perforation_No_visual_aid_graph.png');
     
 print(name, '-dpng');
 
